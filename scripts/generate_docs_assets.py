@@ -233,7 +233,7 @@ def make_energy_decay(out_path):
         m = relax_step(m, g, ep, dt=0.002)
         E_hist.append(total_energy(m, g, ep))
         Q_hist.append(hopf_index(m, g))
-    fig, ax1 = plt.subplots(figsize=(6.8, 4.8))
+    fig, ax1 = plt.subplots(figsize=(6.8, 4.8), constrained_layout=True)
     ax2 = ax1.twinx()
     ax1.plot(E_hist, color="#1f77b4", label="energy", lw=1.6)
     ax2.plot(Q_hist, color="#d62728", label="Q$_H$", lw=1.6)
@@ -242,17 +242,18 @@ def make_energy_decay(out_path):
     ax2.set_ylabel("Q$_H$", color="#d62728")
     ax1.tick_params(axis="y", labelcolor="#1f77b4")
     ax2.tick_params(axis="y", labelcolor="#d62728")
-    # Arrow annotations
+    # Anchor annotation text in axes-fraction so out-of-frame data values can't
+    # blow up the tight bbox when the figure is saved.
     n = len(E_hist)
     ax1.annotate("monotone decrease\nunder damped LLG",
-                 xy=(n // 3, E_hist[n // 3]),
-                 xytext=(n * 0.45, E_hist[0] - 0.2 * (E_hist[0] - E_hist[-1])),
+                 xy=(n // 3, E_hist[n // 3]), xycoords="data",
+                 xytext=(0.45, 0.65), textcoords="axes fraction",
                  arrowprops=dict(arrowstyle="->", color="#1f77b4", lw=1.0),
                  fontsize=9, color="#1f77b4",
                  bbox=dict(boxstyle="round,pad=0.25", fc="white", ec="#1f77b4", alpha=0.9))
     ax2.annotate("Q$_H$ stays integer",
-                 xy=(int(n * 0.8), Q_hist[int(n * 0.8)]),
-                 xytext=(n * 0.55, 0.85),
+                 xy=(int(n * 0.8), Q_hist[int(n * 0.8)]), xycoords="data",
+                 xytext=(0.55, 0.45), textcoords="axes fraction",
                  arrowprops=dict(arrowstyle="->", color="#d62728", lw=1.0),
                  fontsize=9, color="#d62728",
                  bbox=dict(boxstyle="round,pad=0.25", fc="white", ec="#d62728", alpha=0.9))

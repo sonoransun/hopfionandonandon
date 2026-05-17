@@ -131,6 +131,7 @@ CLI exit codes: 0 for `ACCEPT`, 2 for `FAIL`. CI workflows rely on this.
 | Resolution sanity | `max(dx, dy, dz) > R/2` for hopfion / hopfion_array initial state |
 | Box-size vs. hopfion radius | `min(L) < 4R` under periodic BC (avoids periodic-image overlap) |
 | Time-step stability | `dt > dx² / (4 A_ex)` (explicit-stencil exchange bound) |
+| Dipolar requires periodic BC | `material.dipolar: true` with `grid.bc: open` — the FFT demag kernel raises `ValueError` (`src/hopfion/physics/dipolar.py`) |
 | Backend availability | `backend: jax` requested but JAX not installed |
 
 A failing pre-flight aborts the run *before* any LLG step. The verdict is FAIL with the failure recorded in `qc.preflight_failures`.

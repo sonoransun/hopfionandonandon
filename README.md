@@ -50,8 +50,6 @@ Each image below is reproducible from a recipe under `recipes/` or directly from
 
 ### Phase A · single hopfion, ground state
 
-![Energy decay and Q_H stability under damped LLG](docs/assets/energy_decay.png)
-
 *The blue curve shows energy under damped Landau-Lifshitz-Gilbert relaxation — monotonically decreasing, as gradient flow on the energy must. The red curve shows the Hopf invariant Q$_H$: it stays exactly at 1, anchored by the topology. Recipe: `recipes/single_hopfion.yaml`. This is the simplest demonstration that hopfions are *metastable* in the chosen material window (A=1, D=1.5, K=0.7): the energy can drop further (relaxation hasn't fully converged) but Q$_H$ is a frozen integer — moving it would require passing through a singularity that damped dynamics can't access.*
 
 ### Phase A · the FFT-based topology pipeline
@@ -92,7 +90,7 @@ Each image below is reproducible from a recipe under `recipes/` or directly from
 
 ### Phase C · charge transport: density and flux
 
-![ρ_Q heatmap (left) and J streamlines (right)](docs/assets/flux_streamlines.png)
+<img src="docs/assets/flux_streamlines.png" width="820" alt="ρ_Q heatmap (left) and J streamlines (right)" />
 
 *Two views of the *same* moment after a short STT-driven evolution of the Q± pair. **Left**: the Hopf-charge density ρ$_Q$(x, y, z=0), red where $+Q$ accumulates and blue where $-Q$ does. **Right**: streamlines of the topological transport current $\mathbf{J}$(x, y, z=0) on the same slice, computed in [`hopfion.physics.current.topological_current`](src/hopfion/physics/current.py) by solving ∇²φ = ∂$_t$ρ in Fourier space so that ∇·J = −∂$_t$ρ holds by construction. The two views together tell the full story of where the charge **is** and where it's **flowing**.*
 
@@ -118,7 +116,7 @@ Concrete user stories, each tied to a recipe and a Standard Operating Procedure:
 - **Validate a candidate material against the stability window** → [SOP-004](docs/sop/VALIDATE_NEW_MATERIAL.md). Given (A, D, K), run a 3-recipe smoke battery + Hessian probe; grade A–F.
 - **Drive a hopfion via spin-transfer torque** → `recipes/flux_q_pair.yaml` or `recipes/stt_lattice.yaml` + [SOP-005](docs/sop/DRIVE_HOPFION.md). Verifies drift velocity matches Zhang-Li theory.
 - **Build a hopfion-skyrmion hybrid** → `recipes/hopfion_skyrmion_hybrid.yaml` + [SOP-006](docs/sop/BUILD_COMPOSITE.md). Constructs the threaded composite, verifies topology before propagation.
-- **Protect a composite against thermal drift** → `recipes/correction_active.yaml` + [SOP-007](docs/sop/PROTECT_COMPOSITE.md). Compare three correction strategies on the same injected noise.
+- **Protect a composite against thermal drift** → [SOP-007](docs/sop/PROTECT_COMPOSITE.md). Compares three correction strategies (`damping_boost`, `field_pulse`, `surgical_resync` in [`hopfion.physics.correction`](src/hopfion/physics/correction.py)) on the same injected noise.
 
 ## Quickstart
 

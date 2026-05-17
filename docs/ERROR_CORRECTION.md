@@ -74,6 +74,8 @@ Every `cadence` steps the controller computes per-site Q via the centroid segmen
 
 ## Side-by-side comparison protocol
 
+> **Note:** the four recipe templates below are not yet shipped under `recipes/`; author them from the schema in [PIPELINE.md](PIPELINE.md) using `recipes/flux_q_pair.yaml` as a starting point and adding a `correction:` block (`kind: active | topological_gap | stabilizer | none`). Recipe-side wiring is on the wish-list in CLAUDE.md.
+
 Run the same noisy composite recipe under each correction kind:
 
 ```bash

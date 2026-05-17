@@ -132,7 +132,19 @@ $$\frac{d\mathbf{m}}{dt} = -\mathbf{m}\times(\mathbf{m}\times \mathbf{H}_{\rm ef
 
 which is **gradient descent on the energy** restricted to the unit-sphere tangent plane. The simulator uses this for ground-state finding (`llg.relax`).
 
-After each integrator step we renormalize $\mathbf{m} \to \mathbf{m}/|\mathbf{m}|$ to undo $O(dt^2)$ drift away from $S^2$ — the constraint is enforced to machine precision (~$2\times 10^{-16}$). The default integrator is Heun (improved Euler, second order), with RK4 also available.
+After each integrator step we renormalize $\mathbf{m} \to \mathbf{m}/|\mathbf{m}|$ to undo $O(dt^2)$ drift away from $S^2$ — the constraint is enforced to machine precision (~$2\times 10^{-16}$).
+
+### Integrator menu
+
+`src/hopfion/physics/integrators.py` provides:
+
+| Step | Order | Used for |
+|---|---|---|
+| `heun_step` | 2 | Default — general dynamics, lowest cost. |
+| `rk4_step` | 4 | Stiff or long-baseline runs where Heun's $O(dt^2)$ phase error matters. |
+| `adaptive_heun_step` | 2 (w/ error estimate) | Step-size control for runs where $dt$ has to track changing field strength. |
+| `damped_step` | 1 (gradient flow) | Ground-state finding and relaxation. Used by `llg.relax`. |
+| Crouch-Grossman (Phase C) | 2 (geometric, on $S^2$) | Flux-conserving propagation of composite states. See [FLUX_AND_PROPAGATION.md](FLUX_AND_PROPAGATION.md) and [ERROR_CORRECTION.md](ERROR_CORRECTION.md). |
 
 Energy decay and $Q_H$ stability under damped LLG, for a single hopfion:
 
@@ -154,13 +166,13 @@ A **smooth, deterministic field pulse cannot inject Hopf charge into a continuou
 
 Notebook `02_laser_nucleation.ipynb` demonstrates both: a strong deterministic ring pulse perturbs the field but ends at $Q_H = 0$; a stochastic burst (white-noise field representing electron-temperature spikes) reliably nucleates $Q_H = 1$ on cooling.
 
-### Two-temperature stochastic LLG (Phase B, not yet implemented)
+### Two-temperature stochastic LLG (Phase B)
 
 The physically correct picture for femtosecond-laser nucleation. Two coupled ODEs for electron and lattice temperatures,
 
 $$C_e \frac{dT_e}{dt} = -G_{\rm el}(T_e - T_l) + P(t), \qquad C_l \frac{dT_l}{dt} = G_{\rm el}(T_e - T_l),$$
 
-drive a stochastic field $\boldsymbol\eta(t)$ in LLG with variance $\langle\eta_i\eta_j\rangle \propto T_e(t)\,\delta_{ij}/\Delta V$. Integration uses Heun-Stratonovich. The stub interface lives at `src/hopfion/laser.py::TwoTemperaturePulse`.
+drive a stochastic field $\boldsymbol\eta(t)$ in LLG with variance $\langle\eta_i\eta_j\rangle \propto T_e(t)\,\delta_{ij}/\Delta V$. Integration uses Heun-Stratonovich. Implementation: `src/hopfion/physics/two_temp.py::TwoTemperatureLLG` (with a wrapper at `src/hopfion/laser.py::TwoTemperaturePulse`). Driven from a recipe via `run: [{kind: two_temperature_pulse, …}]` — see `recipes/laser_nucleation_2t.yaml`.
 
 ## 7. Moiré modulation
 

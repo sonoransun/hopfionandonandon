@@ -11,7 +11,7 @@
 1. **Seed state**. Run `hopfion run recipes/single_hopfion.yaml`. Use its `runs/single_hopfion_q1/run.h5` as the input.
 2. **Thermal-aged run**. Write a derived recipe with `initial.kind: file`, `file_path: runs/single_hopfion_q1/run.h5`, then a single `thermal_burst` step at the target `kT`. Set `n_steps` long enough to see decay statistics (≥ 5000 for low T).
 3. **Lifetime measurement**. Either use `hopfion.stability.thermal_lifetime` programmatically, or post-process `summary.json`'s `histories.q_hopf.values` and find the first step where `|Q_H - 1| > 0.5`.
-4. **Repeat for T sweep + multiple seeds**:
+4. **Repeat for T sweep + multiple seeds** (compose `recipes/thermal_decay.yaml` from the schema in [PIPELINE.md](../PIPELINE.md) — the template isn't shipped, but the `thermal_burst` run-step kind and the `hopfion batch --sweep` interface both are):
    ```bash
    hopfion batch recipes/thermal_decay.yaml \
      --sweep "run[1].kT=2,5,10,15,20" \

@@ -2,7 +2,7 @@
 
 **Purpose**: given a composite state under a perturbing influence (thermal noise, numerical drift, STT drive that could destabilize topology), choose one of the three error-correction strategies and configure it.
 
-**Recipes**: `recipes/correction_active.yaml`, `recipes/correction_topological_gap.yaml`, `recipes/correction_stabilizer.yaml`.
+**Recipes**: `recipes/correction_active.yaml`, `recipes/correction_topological_gap.yaml`, `recipes/correction_stabilizer.yaml` — these templates are not shipped yet; compose them from the schema in [PIPELINE.md](../PIPELINE.md). The underlying strategies in [`physics/correction.py`](../api/physics_correction.md) are fully implemented and unit-tested.
 
 ## Decision tree
 

@@ -1,0 +1,24 @@
+{
+  "_doc": "Frozen golden output for recipes/regression/*.yaml. Updated when an intentional simulator change is reviewed; the test in tests/test_regression_golden.py diffs run output against this file within tolerance.",
+  "_tolerances": {
+    "Q_final": 0.01,
+    "E_final_rel": 0.01,
+    "max_norm_drift_abs": 1e-12
+  },
+  "single_hopfion_q1": {
+    "recipe": "recipes/regression/single_hopfion_q1.yaml",
+    "Q_final": 0.9923664433071242,
+    "E_final": -654.8144896730416,
+    "max_energy_increase": -4.392859399774238,
+    "max_norm_drift": 4.440892098500626e-16,
+    "verdict": "ACCEPT"
+  },
+  "flux_q_pair": {
+    "recipe": "recipes/regression/flux_conservation_pair.yaml",
+    "Q_final": -0.041849430815501736,
+    "E_final": -1628.6394315057605,
+    "max_energy_increase": -0.6728309700317823,
+    "max_norm_drift": 3.3306690738754696e-16,
+    "verdict": "ACCEPT"
+  }
+}

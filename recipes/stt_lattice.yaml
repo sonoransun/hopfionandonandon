@@ -1,0 +1,58 @@
+name: stt_lattice
+description: |
+  7-hopfion moiré lattice under STT drive. The lattice is pinned by the
+  moiré potential, so the STT does work against the pinning. Per-site Q
+  should remain stable; total drift is slow if the pinning wins.
+
+grid:
+  nx: 96
+  ny: 96
+  nz: 32
+  dx: 0.3
+  bc: periodic
+
+material:
+  A_ex: 1.0
+  D: 1.5
+  Ku: 0.0
+  easy_axis: [0, 0, 1]
+  H_ext: [0, 0, 0]
+  moire:
+    enabled: true
+    K0: 0.7
+    V0: 0.3
+    a_moire: 8.0
+    lattice: triangular
+
+initial:
+  kind: hopfion_array
+  R: 1.5
+  array_lattice: triangular
+  array_a: 8.0
+  array_n_rings: 1
+
+run:
+  - kind: relax                       # land on the local minimum first
+    n_steps: 150
+    dt: 0.002
+  - kind: dynamics_stt
+    n_steps: 200
+    dt: 0.002
+    alpha: 0.2
+    gamma: 1.0
+    u: [0.05, 0.0, 0.0]
+    beta: 0.04
+
+qc:
+  fail_on:
+    - norm_drift_below:        {tol: 1.0e-10}
+  warn_on:
+    - hopf_index_within:       {target: 7.0, tol: 0.5}
+    - syndrome_health:         {min_fidelity: 0.7}
+
+io:
+  out: runs/stt_lattice/
+  extended_metrics: true
+
+seed: 0
+backend: numpy

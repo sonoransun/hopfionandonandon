@@ -1,0 +1,53 @@
+name: laser_nucleation_2t
+description: |
+  Phase-B two-temperature stochastic LLG. A femtosecond pulse spikes the
+  electron-bath temperature; the FDT-consistent stochastic field drives a
+  chaotic spin state from which a Q_H ≈ 1 hopfion can crystallize on cooling.
+  This is the physically grounded successor to recipes/laser_nucleation.yaml.
+
+grid:
+  nx: 48
+  ny: 48
+  nz: 48
+  dx: 0.3
+  bc: periodic
+
+material:
+  A_ex: 1.0
+  D: 1.5
+  Ku: 0.7
+  easy_axis: [0, 0, 1]
+  H_ext: [0, 0, 0]
+
+initial:
+  kind: uniform
+  direction: [0, 0, 1]
+
+run:
+  - kind: two_temperature
+    n_steps: 100
+    dt: 0.002
+    alpha: 0.1
+    gamma: 1.0
+    Te_peak: 20.0
+    tau: 0.05
+    t0: 0.1
+    G_el: 1.0
+    C_e: 1.0
+    C_l: 1.0
+  - kind: relax
+    n_steps: 300
+    dt: 0.002
+
+qc:
+  fail_on:
+    - norm_drift_below:        {tol: 1.0e-10}
+  warn_on:
+    - hopf_index_within:       {target: 1.0, tol: 0.5}
+    - runtime_within:          {max_seconds: 60}
+
+io:
+  out: runs/laser_nucleation_2t/
+
+seed: 0
+backend: numpy

@@ -1,0 +1,44 @@
+name: hopfion_skyrmion_hybrid
+description: |
+  Hopfion threaded by a skyrmion tube. Both topological objects are blended
+  via Gaussian weight. The composite has a Hopf index close to 1 (the
+  central skyrmion-tube region perturbs but doesn't change the global Hopf
+  invariant). Useful as a stress test of the composite-state apparatus.
+
+grid:
+  nx: 48
+  ny: 48
+  nz: 32
+  dx: 0.3
+  bc: periodic
+
+material:
+  A_ex: 1.0
+  D: 1.5
+  Ku: 0.5
+  easy_axis: [0, 0, 1]
+  H_ext: [0, 0, 0]
+
+initial:
+  kind: hopfion_skyrmion_hybrid
+  R: 1.5
+  skyrmion_radius: 0.8
+  skyrmion_helicity: 1.5707963267948966   # π/2 (Bloch)
+
+run:
+  - kind: relax
+    n_steps: 100
+    dt: 0.002
+
+qc:
+  fail_on:
+    - norm_drift_below:        {tol: 1.0e-10}
+  warn_on:
+    - hopf_index_within:       {target: 1.0, tol: 0.5}
+
+io:
+  out: runs/hopfion_skyrmion_hybrid/
+  extended_metrics: true
+
+seed: 0
+backend: numpy

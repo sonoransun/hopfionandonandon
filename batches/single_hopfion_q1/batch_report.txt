@@ -1,0 +1,9 @@
+RECIPE: single_hopfion_q1
+TOTAL RUNS: 6
+PASS: 4  FAIL: 2  YIELD: 67%
+FAILURE MODES:
+  hopf_index_within                    2
+YIELD BY material.D:
+  0.6                   0%
+  1.0                   100%
+  1.5                   100%

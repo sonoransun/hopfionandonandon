@@ -1,0 +1,80 @@
+{
+  "recipe": "single_hopfion_q1",
+  "out_root": "batches/single_hopfion_q1",
+  "yield_overall": 0.6666666666666666,
+  "runs": [
+    {
+      "seed": 0,
+      "overrides": {
+        "material.D": 0.6
+      },
+      "verdict": "FAIL",
+      "q_final": 0.6813612915577657,
+      "wall_seconds": 4.426508442964405,
+      "out_dir": "batches/single_hopfion_q1/material-D-0.6_seed-0",
+      "failures": [
+        "hopf_index_within"
+      ]
+    },
+    {
+      "seed": 1,
+      "overrides": {
+        "material.D": 0.6
+      },
+      "verdict": "FAIL",
+      "q_final": 0.6813612915577657,
+      "wall_seconds": 4.3573053239961155,
+      "out_dir": "batches/single_hopfion_q1/material-D-0.6_seed-1",
+      "failures": [
+        "hopf_index_within"
+      ]
+    },
+    {
+      "seed": 0,
+      "overrides": {
+        "material.D": 1.0
+      },
+      "verdict": "ACCEPT",
+      "q_final": 0.9971168916455084,
+      "wall_seconds": 4.529570818005595,
+      "out_dir": "batches/single_hopfion_q1/material-D-1.0_seed-0",
+      "failures": []
+    },
+    {
+      "seed": 1,
+      "overrides": {
+        "material.D": 1.0
+      },
+      "verdict": "ACCEPT",
+      "q_final": 0.9971168916455084,
+      "wall_seconds": 4.794662861968391,
+      "out_dir": "batches/single_hopfion_q1/material-D-1.0_seed-1",
+      "failures": []
+    },
+    {
+      "seed": 0,
+      "overrides": {
+        "material.D": 1.5
+      },
+      "verdict": "ACCEPT",
+      "q_final": 0.9999292494648431,
+      "wall_seconds": 5.005484588036779,
+      "out_dir": "batches/single_hopfion_q1/material-D-1.5_seed-0",
+      "failures": []
+    },
+    {
+      "seed": 1,
+      "overrides": {
+        "material.D": 1.5
+      },
+      "verdict": "ACCEPT",
+      "q_final": 0.9999292494648431,
+      "wall_seconds": 5.486547104024794,
+      "out_dir": "batches/single_hopfion_q1/material-D-1.5_seed-1",
+      "failures": []
+    }
+  ],
+  "failure_modes": {
+    "hopf_index_within": 2
+  }
+}

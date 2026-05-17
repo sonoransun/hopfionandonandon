@@ -1,0 +1,50 @@
+name: moire_lattice_7
+description: |
+  7-hopfion triangular array pinned by a moiré anisotropy modulation.
+  Initial total Q_H ≈ 7; after relax, ≈ 6.99 (all sites survive).
+
+grid:
+  nx: 96
+  ny: 96
+  nz: 32
+  dx: 0.3
+  bc: periodic
+
+material:
+  A_ex: 1.0
+  D: 1.5
+  Ku: 0.0          # superseded by moire.Ku_field
+  easy_axis: [0, 0, 1]
+  H_ext: [0, 0, 0]
+  moire:
+    enabled: true
+    K0: 0.7
+    V0: 0.3
+    a_moire: 8.0
+    lattice: triangular
+
+initial:
+  kind: hopfion_array
+  R: 1.5
+  array_lattice: triangular
+  array_a: 8.0
+  array_n_rings: 1
+
+run:
+  - kind: relax
+    n_steps: 250
+    dt: 0.002
+
+qc:
+  fail_on:
+    - energy_monotonicity:    {tol: 1.0e-6}
+    - hopf_index_within:      {target: 7.0, tol: 0.3}
+    - norm_drift_below:       {tol: 1.0e-10}
+  warn_on:
+    - runtime_within:         {max_seconds: 180}
+
+io:
+  out: runs/moire_lattice_7/
+
+seed: 0
+backend: numpy

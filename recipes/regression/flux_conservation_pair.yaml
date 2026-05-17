@@ -1,0 +1,45 @@
+name: regression_flux_q_pair
+description: |
+  Locked-down Q± pair propagation. Verifies pair-construction + STT + flux
+  metric collection at small scale. Any drift in metric outputs vs golden
+  values fails the regression test.
+
+grid:
+  nx: 36
+  ny: 36
+  nz: 36
+  dx: 0.4
+  bc: periodic
+
+material:
+  A_ex: 1.0
+  D: 1.5
+  Ku: 0.7
+  easy_axis: [0, 0, 1]
+
+initial:
+  kind: q_pair
+  R: 1.0
+  separation: 4.0
+  axis_of_separation: x
+
+run:
+  - kind: dynamics_stt
+    n_steps: 40
+    dt: 0.002
+    alpha: 0.2
+    gamma: 1.0
+    u: [0.0, 0.0, 0.05]
+    beta: 0.04
+
+qc:
+  fail_on:
+    - norm_drift_below:        {tol: 1.0e-10}
+
+io:
+  out: runs/regression_flux_q_pair/
+  extended_metrics: true
+  write_report: false
+
+seed: 0
+backend: numpy

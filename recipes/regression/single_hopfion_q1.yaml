@@ -1,0 +1,43 @@
+name: regression_single_hopfion_q1
+description: |
+  Frozen regression: small grid, short run, deterministic. Locked output is in
+  recipes/regression/golden.json. Any change to the simulator that alters
+  Q_final, E_final, or norm_drift by more than the tolerance fails CI.
+
+grid:
+  nx: 32
+  ny: 32
+  nz: 32
+  dx: 0.4
+  bc: periodic
+
+material:
+  A_ex: 1.0
+  D: 1.5
+  Ku: 0.7
+  easy_axis: [0, 0, 1]
+  H_ext: [0, 0, 0]
+
+initial:
+  kind: hopfion
+  R: 1.5
+  p: 1
+  q: 1
+
+run:
+  - kind: relax
+    n_steps: 80
+    dt: 0.003
+
+qc:
+  fail_on:
+    - energy_monotonicity: {tol: 1.0e-6}
+    - hopf_index_within:   {target: 1.0, tol: 0.1}
+    - norm_drift_below:    {tol: 1.0e-10}
+
+io:
+  out: runs/regression_single_hopfion_q1/
+  write_report: false
+
+seed: 0
+backend: numpy

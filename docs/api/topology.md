@@ -17,7 +17,12 @@ flowchart LR
 | `hopf_density(m, grid)` | $(3, n_x, n_y, n_z)$ | $\mathbf{F}$ computed via spectral derivatives |
 | `gauge_potential(F, grid)` | $(3, n_x, n_y, n_z)$ | $\mathbf{A}$ with $\nabla\times\mathbf{A} = \mathbf{F}, \nabla\cdot\mathbf{A}=0$ |
 | `hopf_index(m, grid)` | float | $Q_H$ |
+| `skyrmion_charge_density(m, grid)` | $(n_x, n_y, n_z)$ | Pointwise 2D Pontryagin density $\mathbf{m}\cdot(\partial_x\mathbf{m}\times\partial_y\mathbf{m})/4\pi$ (central FD) |
 | `skyrmion_density_xy(m, grid)` | $(n_z,)$ | Per-slice skyrmion charge integrated over $(x,y)$ |
+| `skyrmion_number(m, grid, z_index=None)` | float | Global 2D skyrmion number ($z$-mean, or one slice). $\pm1$ for skyrmion/antiskyrmion |
+| `monopole_density(m, grid)` | $(n_x,n_y,n_z)$ | Emergent-magnetic-charge density $(1/4\pi)\nabla\cdot\mathbf F$ (central FD); ~0 for smooth fields, spikes at Bloch points |
+| `bloch_points(m, grid, threshold_rel=0.3, min_charge=0.3)` | list of `(pos, charge)` | Detect Bloch-point singularities (emergent monopoles). Charge reads below ±1 on a coarse periodic grid; position/sign robust |
+| `linking_number(m, grid, target_a, target_b, tol=0.05)` | float | Gauss linking integral of two preimage loops; \|Lk\| ≈ \|Q_H\| — an FFT-free cross-check (approximate, `tol`-sensitive) |
 | `preimage_mask(m, target, tol=0.15)` | bool array | Cells where $\mathbf{m}\approx \hat{m}_{\rm target}$ |
 | `_spectral_d_axis(s, axis, d, n)` | array | Internal: FFT-based derivative (public for reuse) |
 

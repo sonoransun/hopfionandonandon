@@ -74,9 +74,12 @@ Every `cadence` steps the controller computes per-site Q via the centroid segmen
 
 ## Side-by-side comparison protocol
 
-> **Note:** the four recipe templates below are not yet shipped under `recipes/`; author them from the schema in [PIPELINE.md](PIPELINE.md) using `recipes/flux_q_pair.yaml` as a starting point and adding a `correction:` block (`kind: active | topological_gap | stabilizer | none`). Recipe-side wiring is on the wish-list in CLAUDE.md.
-
-Run the same noisy composite recipe under each correction kind:
+The four recipes ship under `recipes/` (plus `thermal_decay.yaml`, the no-correction
+decay reference). Each declares a root-level `correction:` block (`kind: active |
+topological_gap | stabilizer | none`); the runner builds the controller via
+`make_controller` and weaves its corrective field + per-step monitor into the
+H_extra-capable run steps. The controller's tally lands in
+`summary.json["metrics"]["correction"]`. Run the family and compare `q_hopf.Q_final`:
 
 ```bash
 hopfion run recipes/correction_active.yaml
@@ -84,6 +87,9 @@ hopfion run recipes/correction_topological_gap.yaml
 hopfion run recipes/correction_stabilizer.yaml
 hopfion run recipes/correction_none.yaml          # baseline
 ```
+
+On the shipped 40³ demo, active feedback holds the final $Q_H$ near 1 while the
+no-correction baseline decays (see `tests/test_correction_pipeline.py`).
 
 Compare `runs/<name>/summary.json::metrics.q_hopf.Q_final` across the four. Higher retention of the target Q wins.
 

@@ -7,6 +7,7 @@ Visualization. Static matplotlib for slice quivers + 3D scatter; optional PyVist
 | Function | Output | Backend |
 |---|---|---|
 | `slice_quiver(m, grid, plane="xy", index=None, stride=2, ax=None)` | matplotlib quiver | mpl |
+| `skyrmion_charge_heatmap(m, grid, z_index=None, ax=None, cmap="RdBu_r")` | `(ax, im)` — diverging heatmap of $q_{sk}(x,y)$ | mpl |
 | `preimage_scatter(m, grid, targets=None, tol=0.1, ax=None)` | 3D scatter (mpl) | mpl |
 | `preimage_pyvista(m, grid, targets=None, tol=0.15)` | `pyvista.Plotter` | PyVista |
 

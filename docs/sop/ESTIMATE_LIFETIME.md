@@ -11,7 +11,7 @@
 1. **Seed state**. Run `hopfion run recipes/single_hopfion.yaml`. Use its `runs/single_hopfion_q1/run.h5` as the input.
 2. **Thermal-aged run**. Write a derived recipe with `initial.kind: file`, `file_path: runs/single_hopfion_q1/run.h5`, then a single `thermal_burst` step at the target `kT`. Set `n_steps` long enough to see decay statistics (≥ 5000 for low T).
 3. **Lifetime measurement**. Either use `hopfion.stability.thermal_lifetime` programmatically, or post-process `summary.json`'s `histories.q_hopf.values` and find the first step where `|Q_H - 1| > 0.5`.
-4. **Repeat for T sweep + multiple seeds** (compose `recipes/thermal_decay.yaml` from the schema in [PIPELINE.md](../PIPELINE.md) — the template isn't shipped, but the `thermal_burst` run-step kind and the `hopfion batch --sweep` interface both are):
+4. **Repeat for T sweep + multiple seeds** using the shipped `recipes/thermal_decay.yaml` (its `run[1]` is the sustained `thermal_burst`):
    ```bash
    hopfion batch recipes/thermal_decay.yaml \
      --sweep "run[1].kT=2,5,10,15,20" \
@@ -29,10 +29,20 @@
    res = lowest_eigenmodes(m, grid, ep, k=6)
    prefactor = (np.prod(res.eigenvalues[res.eigenvalues > 0])) ** 0.5
    ```
-4. The activation barrier $E_a$ is the saddle-to-minimum energy difference (requires a separate string-method calculation — Phase C).
-5. Estimate $\tau \approx \tau_0 \exp(E_a / k_B T)$ with $\tau_0 \propto 1/{\rm prefactor}$.
+4. **Activation barrier** $E_a$ — the saddle-to-minimum energy difference along the minimum-energy path from the hopfion to its decay product (e.g. the uniform state), via the shipped string method:
+   ```python
+   from hopfion.field import uniform
+   from hopfion.physics.string_method import string_method, arrhenius_lifetime
+   path = string_method(m, uniform(grid, (0, 0, 1)), grid, ep, n_images=11, n_iter=400)
+   E_a = path.barrier                     # saddle - start; path.saddle_index locates the ridge
+   ```
+   Note the barrier is grid-resolution dependent: on coarse grids the lattice can unwind the topology cheaply, so refine `dx` for a quantitative $E_a$ (the method is validated against the analytic anisotropy double-well — see `tests/test_string_method.py`).
+5. **Lifetime**:
+   ```python
+   tau = arrhenius_lifetime(E_a, kT=0.5, prefactor=prefactor, tau0=1.0)   # τ ≈ (τ0/prefactor)·exp(E_a/kT)
+   ```
 
-Method A gives a direct number; Method B is faster but requires a known $E_a$ from external work.
+Method A gives a direct number; Method B (Hessian pre-factor + string-method barrier) is faster and now fully in-tree.
 
 ## Acceptance criteria
 

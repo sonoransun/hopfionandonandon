@@ -17,7 +17,10 @@ PARAM_SETS = [
     ("dmi",       EnergyParams(A_ex=0.0, D=0.4, Ku=0.0, H_ext=(0, 0, 0))),
     ("anisotropy",EnergyParams(A_ex=0.0, D=0.0, Ku=0.5, easy_axis=(1, 0, 0), H_ext=(0, 0, 0))),
     ("zeeman",    EnergyParams(A_ex=0.0, D=0.0, Ku=0.0, H_ext=(0.1, 0.2, 0.05))),
+    ("interfacial_dmi", EnergyParams(A_ex=0.0, D=0.0, Ku=0.0, D_interface=0.4, H_ext=(0, 0, 0))),
+    ("cubic",     EnergyParams(A_ex=0.0, D=0.0, Ku=0.0, Kc=0.5, H_ext=(0, 0, 0))),
     ("combined",  EnergyParams(A_ex=1.0, D=0.4, Ku=0.3, easy_axis=(0, 0, 1), H_ext=(0.0, 0.0, 0.1))),
+    ("combined_new", EnergyParams(A_ex=1.0, D_interface=0.3, Kc=0.4, easy_axis=(0, 0, 1), H_ext=(0.0, 0.0, 0.1))),
 ]
 
 

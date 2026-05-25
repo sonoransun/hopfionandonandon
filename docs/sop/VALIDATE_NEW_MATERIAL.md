@@ -20,33 +20,39 @@ If the candidate falls outside these ranges, hopfion stabilization is unlikely o
 
 ## Standard battery
 
-Run these three recipes with the candidate material substituted:
+The `validate` subcommand automates the whole battery — substitute the candidate
+material, run `single` / `nucleate` / `lattice`, and print the grade:
 
 ```bash
-# Substitute (A_ex, D, Ku) in the recipe via the CLI sweep:
-hopfion run recipes/single_hopfion.yaml \
-  --out runs/validation/{material}/single/
-hopfion run recipes/laser_nucleation_2t.yaml \
-  --out runs/validation/{material}/nucleate/
-hopfion run recipes/moire_lattice.yaml \
-  --out runs/validation/{material}/lattice/
+hopfion validate --material A_ex=1.0,D=1.5,Ku=0.7            # authoritative
+hopfion validate --material A_ex=1.0,D=1.5,Ku=0.7 --quick   # fast smoke (caps steps)
+hopfion validate --material A_ex=1.0,D=1.5,Ku=0.7 --hessian # + min-eigenvalue probe
 ```
 
-(For a real workflow, write a YAML template and substitute via `jinja2` or a small Python wrapper. Phase C will add a `--material A_ex=X,D=Y,Ku=Z` shorthand.)
+`--quick` caps each run-step's `n_steps` for speed; it can over-grade an unstable
+material because the topology hasn't had time to decay, so use the full (non-quick)
+battery for an authoritative grade. The pre-flight `L_D` / `Q` metrics are printed
+either way. The three recipes (`single_hopfion`, `laser_nucleation_2t`,
+`moire_lattice`) are run with the substituted material; outputs land under
+`runs/validation/<material>/`.
 
 ## Acceptance grades
 
-| Outcome of all three | Grade | Recommendation |
+`single` (an isolated hopfion holding) is the gate; if it fails, the material fails.
+
+| Battery outcome | Grade | Recommendation |
 |---|---|---|
-| All ACCEPT | A | material is in the sweet spot; proceed to lifetime work (SOP-003) |
-| single ACCEPT, others FAIL | B | usable for isolated hopfions but lattice geometry needs tuning |
-| only single + nucleate ACCEPT | C | hopfion is metastable but the moiré lattice doesn't pin reliably |
-| only single ACCEPT | D | usable only as a one-off; expect lifetime issues |
-| none ACCEPT | F | not in the stability window; revisit (A_ex, D, K_u) |
+| single + nucleate + lattice ACCEPT | A | sweet spot; proceed to lifetime work (SOP-003) |
+| single + lattice ACCEPT (nucleate FAIL) | B | isolated + lattice work; nucleation marginal |
+| single + nucleate ACCEPT (lattice FAIL) | C | metastable + nucleates, but the moiré lattice doesn't pin |
+| single ACCEPT only | D | usable as a one-off; expect lifetime issues |
+| single FAIL | F | not in the stability window; revisit (A_ex, D, K_u) |
 
 ## Quick diagnostic
 
-For a non-A grade, run the Hessian probe on the relaxed single-hopfion seed:
+For a non-A grade, `hopfion validate --hessian ...` runs a Hessian probe on the
+relaxed single-hopfion seed and prints `min_eig` (a negative value flags a saddle,
+not a minimum). To run it by hand on a saved run:
 
 ```bash
 hopfion run recipes/single_hopfion.yaml --out runs/validation/{material}/single/

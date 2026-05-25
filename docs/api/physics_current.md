@@ -7,10 +7,12 @@ Topological current $\mathbf{J}(r, t)$ and Lagrangian centroid drift tracking.
 | Function | Purpose |
 |---|---|
 | `hopf_charge_density(m, grid)` | scalar $\rho_Q(\mathbf{r}) = (1/16\pi^2) \mathbf{A}\cdot\mathbf{F}$ |
+| `emergent_field(m, grid)` | `(b_e, monopole_density)` — emergent flux density $\mathbf b_e=\mathbf F/4\pi$ + emergent-monopole density $\nabla\cdot\mathbf b_e$ (Bloch-point charge) |
 | `topological_current(m, m_next, grid, dt)` | transport current $\mathbf{J}$; built via Poisson inversion so $\nabla\cdot\mathbf{J} = -\partial_t\rho$ by construction |
 | `divergence_J(J, grid)` | spectral $\nabla\cdot\mathbf{J}$ |
 | `conservation_residual(m, m_next, grid, dt)` | $\partial_t\rho + \nabla\cdot\mathbf{J}$ pointwise — should be ~0 |
 | `centroids(rho_Q, grid, threshold_rel=0.1)` | cluster $\|\rho_Q\|$ via `scipy.ndimage.label`, return charge-weighted centroids |
+| `per_site_charges(rho_Q, grid, sites)` | integrate $\rho_Q$ over each lattice site's Voronoi zone (`scipy.spatial.cKDTree`); one signed charge per site, summing to the system charge |
 | `drift_velocity(history, times)` | central-difference per-cluster velocities |
 | `Centroid` | dataclass: `position`, `charge`, `cluster_size` |
 

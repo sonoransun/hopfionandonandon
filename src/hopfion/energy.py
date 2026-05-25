@@ -18,7 +18,7 @@ from dataclasses import dataclass, field
 from typing import Optional, Tuple
 
 from hopfion.backend import xp
-from hopfion.grid import Grid, curl, grad_vector, laplacian_vector
+from hopfion.grid import Grid, curl, d_axis, grad_vector, laplacian_vector
 
 
 @dataclass
@@ -27,7 +27,9 @@ class EnergyParams:
 
     A_ex: float = 1.0
     D: float = 0.0
+    D_interface: float = 0.0      # interfacial (Néel) DMI strength
     Ku: float = 0.0
+    Kc: float = 0.0               # cubic anisotropy strength
     easy_axis: Tuple[float, float, float] = (0.0, 0.0, 1.0)
     H_ext: Tuple[float, float, float] = (0.0, 0.0, 0.0)
     # Optional spatially varying anisotropy strength (e.g. moire modulation).
@@ -72,6 +74,51 @@ def dmi_field(m, grid: Grid, D: float):
     return -2.0 * D * curl(m, grid)
 
 
+def interfacial_dmi_energy(m, grid: Grid, Di: float) -> float:
+    """Interfacial (Néel) DMI — the C_nv Lifshitz invariant favouring Néel
+    (hedgehog) helicity, distinct from the bulk Bloch ``dmi_energy``:
+
+        w = D_i [ m_z (d_x m_x + d_y m_y) - (m_x d_x m_z + m_y d_y m_z) ].
+    """
+    np = xp()
+    dx_mx = d_axis(m[0], 0, grid.dx, grid)
+    dy_my = d_axis(m[1], 1, grid.dy, grid)
+    dx_mz = d_axis(m[2], 0, grid.dx, grid)
+    dy_mz = d_axis(m[2], 1, grid.dy, grid)
+    w = Di * (m[2] * (dx_mx + dy_my) - (m[0] * dx_mz + m[1] * dy_mz))
+    return float(np.sum(w) * grid.dV)
+
+
+def interfacial_dmi_field(m, grid: Grid, Di: float):
+    """H = -delta E / delta m for the interfacial DMI (central-difference adjoint
+    of ``interfacial_dmi_energy``): H = 2 D_i (d_x m_z, d_y m_z, -(d_x m_x + d_y m_y))."""
+    np = xp()
+    dx_mz = d_axis(m[2], 0, grid.dx, grid)
+    dy_mz = d_axis(m[2], 1, grid.dy, grid)
+    dx_mx = d_axis(m[0], 0, grid.dx, grid)
+    dy_my = d_axis(m[1], 1, grid.dy, grid)
+    return 2.0 * Di * np.stack([dx_mz, dy_mz, -(dx_mx + dy_my)], axis=0)
+
+
+def cubic_anisotropy_energy(m, grid: Grid, Kc: float) -> float:
+    """Cubic anisotropy with <100> easy axes:
+
+        w = K_c (m_x^2 m_y^2 + m_y^2 m_z^2 + m_z^2 m_x^2).
+    """
+    np = xp()
+    mx2, my2, mz2 = m[0] * m[0], m[1] * m[1], m[2] * m[2]
+    return float(Kc * np.sum(mx2 * my2 + my2 * mz2 + mz2 * mx2) * grid.dV)
+
+
+def cubic_anisotropy_field(m, grid: Grid, Kc: float):
+    """H = -delta w / delta m: H_i = -2 K_c m_i (sum of the other two squared)."""
+    np = xp()
+    mx2, my2, mz2 = m[0] * m[0], m[1] * m[1], m[2] * m[2]
+    return -2.0 * Kc * np.stack(
+        [m[0] * (my2 + mz2), m[1] * (mx2 + mz2), m[2] * (mx2 + my2)], axis=0
+    )
+
+
 def anisotropy_energy(m, grid: Grid, Ku, easy_axis: Tuple[float, float, float]) -> float:
     """``Ku`` may be a scalar or a spatial array."""
     np = xp()
@@ -113,7 +160,9 @@ def total_energy(m, grid: Grid, p: EnergyParams) -> float:
     e = (
         exchange_energy(m, grid, p.A_ex)
         + dmi_energy(m, grid, p.D)
+        + interfacial_dmi_energy(m, grid, p.D_interface)
         + anisotropy_energy(m, grid, Ku, p.easy_axis)
+        + cubic_anisotropy_energy(m, grid, p.Kc)
         + zeeman_energy(m, grid, p.H_ext)
     )
     if p.dipolar:
@@ -128,7 +177,9 @@ def effective_field(m, grid: Grid, p: EnergyParams):
     H = (
         exchange_field(m, grid, p.A_ex)
         + dmi_field(m, grid, p.D)
+        + interfacial_dmi_field(m, grid, p.D_interface)
         + anisotropy_field(m, grid, Ku, p.easy_axis)
+        + cubic_anisotropy_field(m, grid, p.Kc)
         + zeeman_field(m, grid, p.H_ext)
     )
     if p.dipolar:

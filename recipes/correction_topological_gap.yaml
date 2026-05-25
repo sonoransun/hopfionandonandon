@@ -1,0 +1,53 @@
+name: correction_topological_gap
+description: |
+  Passive topological-gap protection. A TopologicalGapController runs a Hessian
+  pre-flight: it computes the lowest eigenvalue of the relaxed state (the
+  "topological gap") and checks it against `min_gap`, recording the value in
+  summary.json["metrics"]["correction"]["preflight"]. On a well-resolved, fully
+  relaxed minimum the gap is ≥ 0; on a coarse grid / short relax it can read
+  marginally negative. The recommended companion for the dynamics phase is the
+  flux-conserving Crouch-Grossman integrator. This controller is passive: it
+  gates nothing, it only reports.
+
+grid:
+  nx: 40
+  ny: 40
+  nz: 40
+  dx: 0.4
+  bc: periodic
+
+material:
+  A_ex: 1.0
+  D: 1.5
+  Ku: 0.7
+  easy_axis: [0, 0, 1]
+  H_ext: [0, 0, 0]
+
+initial:
+  kind: hopfion
+  R: 1.5
+
+run:
+  - kind: relax
+    n_steps: 120
+    dt: 0.002
+  - kind: dynamics
+    n_steps: 40
+    dt: 0.002
+    alpha: 0.05
+
+correction:
+  kind: topological_gap
+  min_gap: -0.001
+
+qc:
+  fail_on:
+    - norm_drift_below:  {tol: 1.0e-10}
+  warn_on:
+    - hopf_index_within: {target: 1.0, tol: 0.1}
+
+io:
+  out: runs/correction_topological_gap/
+
+seed: 0
+backend: numpy

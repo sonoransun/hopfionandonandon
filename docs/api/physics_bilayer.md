@@ -43,8 +43,8 @@ m1, m2 = engine.relax(m1_init, m2_init, grid, n_steps=200)
 ## Caveats
 
 - The moiré pattern is encoded in $\chi$, which is z-invariant (the moiré is a 2D phenomenon). Both layers share the same 3D grid for code simplicity.
-- Setting `J0 = 0` exactly decouples the layers — they evolve independently. This is the smoke-test pathway.
-- Phase B's bilayer doesn't yet have a recipe `kind: bilayer` (it's a stand-alone module). Recipe support is on the Phase C wish-list.
+- Setting `J0 = 0` exactly decouples the layers — they evolve independently. This is the smoke-test pathway (`tests/test_bilayer_runstep.py` asserts layer-1 then matches a plain relax).
+- A recipe `run: [{kind: bilayer, ...}]` step is shipped (`recipes/bilayer_demo.yaml`): the recipe's `initial` is layer 1, layer 2 is built from `bilayer_layer2` (`uniform`/`same`/`hopfion`), the pair is relaxed (damped), and layer 2 is written to `run.h5` as the `m2` dataset. There's no two-layer *initial* spec and no precessional bilayer step yet.
 
 ## See also
 

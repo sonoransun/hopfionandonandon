@@ -23,7 +23,7 @@ import numpy as _np
 
 from hopfion.backend import to_numpy, use as use_backend
 from hopfion.energy import EnergyParams
-from hopfion.field import add_perturbation, hopfion, uniform
+from hopfion.field import add_perturbation, hopfion, skyrmion, uniform
 from hopfion.grid import Grid
 from hopfion.laser import GaussianPulse
 from hopfion.lattice import (
@@ -74,6 +74,31 @@ def build_energy_params(rc: RecipeConfig, grid: Grid) -> EnergyParams:
     )
 
 
+_CORRECTION_FIELDS = {
+    "active": ["target_Q", "threshold", "gain", "cadence", "correction_duration"],
+    "topological_gap": ["min_gap"],
+    "stabilizer": ["expected_sites", "flip_threshold", "cadence",
+                   "re_nucleation_kT", "re_nucleation_steps"],
+}
+
+
+def _correction_params(spec) -> Dict[str, Any]:
+    """Forward only the tuning fields the chosen controller accepts."""
+    return {k: getattr(spec, k) for k in _CORRECTION_FIELDS.get(spec.kind, [])}
+
+
+def _build_sites(spec):
+    """Lattice site list for a `hopfion_array` initial state."""
+    if spec.array_lattice == "triangular":
+        return triangular_sites_2d(a=spec.array_a, n_rings=spec.array_n_rings)
+    if spec.array_lattice == "square":
+        return square_sites_2d(a=spec.array_a, nx=spec.array_nx, ny=spec.array_ny)
+    if spec.array_lattice == "cubic":
+        return cubic_sites_3d(a=spec.array_a,
+                              nx=spec.array_nx, ny=spec.array_ny, nz=spec.array_nx)
+    raise ValueError(f"Unknown array_lattice {spec.array_lattice!r}")
+
+
 def build_initial_state(rc: RecipeConfig, grid: Grid):
     spec = rc.initial
     if spec.kind == "uniform":
@@ -85,16 +110,7 @@ def build_initial_state(rc: RecipeConfig, grid: Grid):
         return hopfion(grid, R=spec.R, p=spec.p, q=spec.q,
                        center=spec.center, axis=spec.axis)
     if spec.kind == "hopfion_array":
-        if spec.array_lattice == "triangular":
-            sites = triangular_sites_2d(a=spec.array_a, n_rings=spec.array_n_rings)
-        elif spec.array_lattice == "square":
-            sites = square_sites_2d(a=spec.array_a, nx=spec.array_nx, ny=spec.array_ny)
-        elif spec.array_lattice == "cubic":
-            sites = cubic_sites_3d(a=spec.array_a,
-                                   nx=spec.array_nx, ny=spec.array_ny, nz=spec.array_nx)
-        else:
-            raise ValueError(f"Unknown array_lattice {spec.array_lattice!r}")
-        return array_hopfion(grid, sites, R=spec.R, axis=spec.axis)
+        return array_hopfion(grid, _build_sites(spec), R=spec.R, axis=spec.axis)
     if spec.kind == "file":
         if not spec.file_path:
             raise ValueError("initial.kind='file' requires file_path")
@@ -112,6 +128,11 @@ def build_initial_state(rc: RecipeConfig, grid: Grid):
                                        skyrmion_radius=spec.skyrmion_radius,
                                        skyrmion_helicity=spec.skyrmion_helicity,
                                        center=spec.center)
+    if spec.kind == "skyrmion":
+        return skyrmion(grid, radius=spec.skyrmion_radius,
+                        helicity=spec.skyrmion_helicity,
+                        vorticity=spec.skyrmion_vorticity,
+                        center=(spec.center[0], spec.center[1]))
     if spec.kind == "skyrmion_tube":
         from hopfion.physics.composite import skyrmion_tube
         return skyrmion_tube(grid, radius=spec.skyrmion_radius,
@@ -125,9 +146,25 @@ def build_initial_state(rc: RecipeConfig, grid: Grid):
 
 
 def _execute_step(m, grid: Grid, ep: EnergyParams, step: RunStep,
-                  rc: RecipeConfig, collector: MetricCollector, rng: _np.random.Generator):
-    """Execute one run step in place; returns the new m."""
+                  rc: RecipeConfig, collector: MetricCollector, rng: _np.random.Generator,
+                  extra_out: Optional[Dict[str, Any]] = None, controller=None):
+    """Execute one run step in place; returns the new m.
+
+    ``extra_out`` is an optional dict a step may populate with auxiliary fields
+    (e.g. the bilayer second layer) for the writer to persist. ``controller`` is
+    an optional error-correction controller whose corrective field and per-step
+    monitor are woven into the H_extra-capable steps (dynamics / pulse /
+    thermal_burst).
+    """
     collector.phase = step.kind
+
+    # Error-correction hooks (no-ops when controller is None).
+    ctrl_H = controller.H_extra_factory() if controller is not None else None
+
+    def _cb(_m, _k, _t):
+        collector.integrate_callback(_m, _k, _t)
+        if controller is not None:
+            controller.step_callback(_m, _k, _t)
 
     if step.kind == "relax":
         return relax(m, grid, ep, n_steps=step.n_steps, dt=step.dt,
@@ -135,17 +172,28 @@ def _execute_step(m, grid: Grid, ep: EnergyParams, step: RunStep,
 
     if step.kind == "dynamics":
         lp = LLGParams(gamma=step.gamma, alpha=step.alpha, dt=step.dt)
-        return integrate(m, grid, ep, lp, n_steps=step.n_steps,
-                         step_callback=collector.integrate_callback)
+        if step.integrator == "implicit_midpoint":
+            from hopfion.physics.integrators import implicit_midpoint_step
+            t = 0.0
+            for k in range(step.n_steps):
+                m = implicit_midpoint_step(m, grid, ep, step.gamma, step.alpha,
+                                           step.dt, H_extra=ctrl_H)
+                t += step.dt
+                _cb(m, k, t)
+            return m
+        H_extra = None if ctrl_H is None else (lambda x, t: ctrl_H(x))
+        return integrate(m, grid, ep, lp, n_steps=step.n_steps, H_extra=H_extra,
+                         step_callback=_cb)
 
     if step.kind == "pulse":
         lp = LLGParams(gamma=step.gamma, alpha=step.alpha, dt=step.dt)
         pulse = GaussianPulse(H0=step.H0, t0=step.t0, tau=step.tau,
                               profile=step.profile, width=step.pulse_width,
                               ring_radius=step.ring_radius)
-        H_extra = pulse.field_factory(grid)
+        Hp = pulse.field_factory(grid)
+        H_extra = Hp if ctrl_H is None else (lambda x, t: Hp(x, t) + ctrl_H(x))
         return integrate(m, grid, ep, lp, n_steps=step.n_steps, H_extra=H_extra,
-                         step_callback=collector.integrate_callback)
+                         step_callback=_cb)
 
     if step.kind == "thermal_burst":
         # Phase-A white-noise burst stand-in for the Phase-B two-temperature engine.
@@ -153,9 +201,12 @@ def _execute_step(m, grid: Grid, ep: EnergyParams, step: RunStep,
         sigma = (2.0 * lp.alpha * step.kT / (lp.dt * grid.dV)) ** 0.5
         for k in range(step.n_steps):
             noise = rng.normal(size=(3, grid.nx, grid.ny, grid.nz)) * sigma
-            H_extra = (lambda _m, _N=noise: _N)
+            if ctrl_H is None:
+                H_extra = (lambda _m, _N=noise: _N)
+            else:
+                H_extra = (lambda _m, _N=noise: _N + ctrl_H(_m))
             m = llg_step_heun(m, grid, ep, lp, H_extra=H_extra)
-            collector.integrate_callback(m, k, t=(k + 1) * lp.dt)
+            _cb(m, k, (k + 1) * lp.dt)
         return m
 
     if step.kind == "two_temperature":
@@ -180,6 +231,57 @@ def _execute_step(m, grid: Grid, ep: EnergyParams, step: RunStep,
             collector.integrate_callback(m, k, t=t)
         return m
 
+    if step.kind == "dynamics_sot":
+        # Spin-orbit torque (damping-like + field-like), a local switching drive.
+        from hopfion.physics.sot import SOTParams, sot_step_heun
+        sot = SOTParams(p=step.sot_p, dl=step.sot_dl, fl=step.sot_fl)
+        t = 0.0
+        for k in range(step.n_steps):
+            m = sot_step_heun(m, grid, ep, step.gamma, step.alpha, step.dt, sot,
+                              H_extra=(None if ctrl_H is None else (lambda x: ctrl_H(x))))
+            t += step.dt
+            _cb(m, k, t)
+        return m
+
+    if step.kind == "ac_drive":
+        # Oscillatory drive H_ac·cos(ω t) (microwave / FMR excitation).
+        lp = LLGParams(gamma=step.gamma, alpha=step.alpha, dt=step.dt)
+        Hx, Hy, Hz = step.ac_H0
+        w = step.ac_omega
+
+        def _ac(_m, _t):
+            np = _np
+            shape = np.asarray(_m)[0].shape
+            c = np.cos(w * _t)
+            base = np.stack([np.full(shape, Hx * c), np.full(shape, Hy * c),
+                             np.full(shape, Hz * c)], axis=0)
+            return base if ctrl_H is None else base + ctrl_H(_m)
+        return integrate(m, grid, ep, lp, n_steps=step.n_steps, H_extra=_ac,
+                         step_callback=_cb)
+
+    if step.kind == "bilayer":
+        # B3: twisted-bilayer coupled relaxation. Current m = layer 1; layer 2 is
+        # built per `bilayer_layer2` and persisted to run.h5 via extra_out.
+        from hopfion.physics.bilayer import BilayerConfig, BilayerLLG, registry_field
+        if step.bilayer_layer2 == "same":
+            m2 = m
+        elif step.bilayer_layer2 == "hopfion":
+            m2 = hopfion(grid, R=rc.initial.R)
+        else:  # "uniform"
+            m2 = uniform(grid, direction=(0.0, 0.0, 1.0))
+        cfg = BilayerConfig(theta=step.bilayer_theta, a=step.bilayer_a, J0=step.bilayer_J0)
+        engine = BilayerLLG(ep1=ep, ep2=ep, cfg=cfg,
+                            gamma=step.gamma, alpha=step.alpha, dt=step.dt)
+        chi = registry_field(grid, cfg)
+        t = 0.0
+        for k in range(step.n_steps):
+            m, m2 = engine.relax_step(m, m2, grid, chi)
+            t += step.dt
+            collector.integrate_callback(m, k, t=t)
+        if extra_out is not None:
+            extra_out["m2"] = m2
+        return m
+
     raise ValueError(f"Unknown run-step kind: {step.kind!r}")
 
 
@@ -191,7 +293,7 @@ def _execute_step(m, grid: Grid, ep: EnergyParams, step: RunStep,
 def _write_outputs(out_dir: Path, m_final, grid: Grid, ep: EnergyParams,
                    rc: RecipeConfig, qc_report: qc_mod.QCReport,
                    summaries: Dict[str, Any], histories: Dict[str, Any],
-                   seconds: float) -> None:
+                   seconds: float, extra_out: Optional[Dict[str, Any]] = None) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
 
     # HDF5: final field + Ku_field if spatially varying
@@ -201,6 +303,8 @@ def _write_outputs(out_dir: Path, m_final, grid: Grid, ep: EnergyParams,
         f.create_dataset("m", data=to_numpy(m_final))
         if ep.Ku_field is not None:
             f.create_dataset("Ku_field", data=to_numpy(ep.Ku_field))
+        if extra_out and "m2" in extra_out:
+            f.create_dataset("m2", data=to_numpy(extra_out["m2"]))
         # grid + flat material attrs
         f.attrs.update(dict(
             nx=grid.nx, ny=grid.ny, nz=grid.nz,
@@ -274,11 +378,25 @@ def run(rc: RecipeConfig, write: bool = True, hopf_cadence: int = 25) -> RunResu
     ep = build_energy_params(rc, grid)
     m = build_initial_state(rc, grid)
 
+    # Error-correction controller (None when correction.kind == "none")
+    from hopfion.physics.correction import make_controller
+    controller = make_controller(rc.correction.kind, grid, ep,
+                                 **_correction_params(rc.correction))
+    gap_preflight = None
+    if controller is not None and rc.correction.kind == "topological_gap":
+        ok, min_eig = controller.preflight(m)
+        gap_preflight = {"ok": bool(ok), "min_eig": float(min_eig)}
+
     # 3. Execute
     rng = _np.random.default_rng(rc.seed)
     metrics_list = (extended_metrics(hopf_cadence=hopf_cadence, drift_cadence=hopf_cadence)
                     if rc.io.extended_metrics
                     else default_metrics(hopf_cadence=hopf_cadence))
+    if rc.io.extended_metrics and rc.initial.kind == "hopfion_array":
+        from hopfion.pipeline.metrics import PerSiteQVoronoi
+        metrics_list = list(metrics_list) + [
+            PerSiteQVoronoi(sites=_build_sites(rc.initial), cadence=hopf_cadence)
+        ]
     collector = MetricCollector(metrics=metrics_list, grid=grid, ep=ep)
     # seed metrics with the initial state
     from hopfion.pipeline.metrics import MetricContext
@@ -288,12 +406,24 @@ def run(rc: RecipeConfig, write: bool = True, hopf_cadence: int = 25) -> RunResu
             met.collect(init_ctx)
 
     t_start = time.perf_counter()
+    extra_out: Dict[str, Any] = {}
     for step in rc.run:
-        m = _execute_step(m, grid, ep, step, rc, collector, rng)
+        m = _execute_step(m, grid, ep, step, rc, collector, rng,
+                          extra_out=extra_out, controller=controller)
     seconds = time.perf_counter() - t_start
 
     # 4. QC
     summaries = collector.summarize()
+    if controller is not None:
+        cres = controller.result
+        summaries["correction"] = {
+            "kind": cres.kind,
+            "n_corrections": int(cres.n_corrections),
+            "final_fidelity": float(cres.final_fidelity),
+            "n_events": len(cres.correction_events),
+        }
+        if gap_preflight is not None:
+            summaries["correction"]["preflight"] = gap_preflight
     qc_report = qc_mod.evaluate(rc.qc, summaries,
                                 preflight_failures=pre.failures,
                                 preflight_warnings=pre.warnings)
@@ -302,7 +432,7 @@ def run(rc: RecipeConfig, write: bool = True, hopf_cadence: int = 25) -> RunResu
     out_dir = Path(rc.io.out)
     if write:
         _write_outputs(out_dir, m, grid, ep, rc, qc_report, summaries,
-                       collector.histories(), seconds)
+                       collector.histories(), seconds, extra_out=extra_out)
 
     return RunResult(recipe=rc, qc=qc_report, metrics=summaries,
                      m_final=m, out_dir=str(out_dir), seconds=seconds,

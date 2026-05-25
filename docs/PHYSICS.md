@@ -66,6 +66,20 @@ Central finite differences of $\mathbf{m}$ make $\mathbf{F}$ second-order accura
 
 (Implementation: `src/hopfion/topology.py::_spectral_d_axis`.)
 
+### The 2D skyrmion (Pontryagin) charge
+
+The Hopf invariant is the linking number of a *3D* texture. Its 2D cousin — the charge of a magnetic skyrmion — is the degree of the map $\mathbf{m}: (x,y) \to S^2$ on a single plane:
+
+$$\boxed{\ N_{sk} \;=\; \frac{1}{4\pi}\int \mathbf{m}\cdot(\partial_x \mathbf{m}\times\partial_y \mathbf{m})\, dx\,dy\ }$$
+
+This is the integral over one $(x,y)$ slice of the same density that appears (per cyclic index) in $\mathbf{F}$ above — the integrand is $\mathbf{F}_z/(4\pi)$. A skyrmion has $N_{sk} = \pm 1$; an **antiskyrmion** carries the opposite sign. The constructor `field.skyrmion(grid, radius, helicity, vorticity)` builds a $360°$ in-plane domain wall $\theta(\rho) = \pi\,e^{-\rho^2/2r^2}$ extruded along $z$; `helicity` selects Néel ($0$) vs Bloch ($\pi/2$), and `vorticity` $=\pm1$ selects skyrmion vs antiskyrmion (it flips $N_{sk}$). With the default profile $N_{sk}\approx-1$.
+
+Unlike the Hopf index, the skyrmion charge is intrinsically two-dimensional, so it is computed with **central finite differences** (no FFT, no periodic-BC requirement) and reported per $z$-slice (`skyrmion_density_xy`) or as a single $z$-mean scalar (`skyrmion_number`). The pointwise density (`skyrmion_charge_density`) is what `viz.skyrmion_charge_heatmap` renders:
+
+![Skyrmion vs antiskyrmion charge](assets/skyrmion_charge.png)
+
+(Implementation: `src/hopfion/topology.py::{skyrmion_charge_density,skyrmion_density_xy,skyrmion_number}`, `src/hopfion/field.py::skyrmion`.)
+
 ## 3. Micromagnetic energy
 
 Energy density terms, with $\mathbf{m}(\mathbf{r})$ a unit vector field. Effective field follows from $\mathbf{H}_{\rm eff} = -\delta E/\delta \mathbf{m}$ (units: $\mu_0 M_s = 1$).
@@ -80,11 +94,28 @@ $$E_{\rm DMI} = D \int \mathbf{m}\cdot(\nabla\times\mathbf{m}) \, d^3 r, \qquad 
 
 The DMI's helicity is what lets non-coplanar textures (skyrmions, hopfions) be local energy minima rather than relaxing to a ferromagnet.
 
+### Interfacial Dzyaloshinskii–Moriya interaction (Néel type)
+
+The $C_{nv}$ Lifshitz invariant (thin-film / interface symmetry), favouring Néel
+(hedgehog) helicity instead of the Bloch helicity of the bulk term:
+
+$$E_{\rm iDMI} = D_i \int \big[m_z(\partial_x m_x + \partial_y m_y) - (m_x\partial_x m_z + m_y\partial_y m_z)\big]\, d^3r,$$
+$$\mathbf{H}_{\rm iDMI} = 2 D_i\,(\partial_x m_z,\; \partial_y m_z,\; -(\partial_x m_x + \partial_y m_y)).$$
+
+Set via `EnergyParams.D_interface`; the adjoint is verified by the FD-consistency
+test (`tests/test_energy.py::PARAM_SETS`).
+
 ### Uniaxial anisotropy
 
 $$E_{\rm an} = -K_u \int (\mathbf{m}\cdot\hat{e})^2 \, d^3 r, \qquad \mathbf{H}_{\rm an} = 2 K_u (\mathbf{m}\cdot\hat{e})\, \hat{e}.$$
 
 The simulator supports a spatially varying $K_u(\mathbf{r})$ — that's how the toy moiré modulation enters the energy.
+
+### Cubic anisotropy
+
+$$E_{\rm cubic} = K_c \int (m_x^2 m_y^2 + m_y^2 m_z^2 + m_z^2 m_x^2)\, d^3r, \qquad H_{c,i} = -2 K_c\, m_i\,(m_j^2 + m_k^2).$$
+
+Set via `EnergyParams.Kc` (the $\langle 100\rangle$-easy convention).
 
 ### Zeeman
 
@@ -193,6 +224,35 @@ Plugging $K_u(\mathbf{r})$ in for the scalar $K_u$ in the anisotropy energy term
 ![Moiré lattice after relax](assets/moire_lattice.png)
 
 The bilayer twisted-stack version, where the moiré arises naturally from inter-layer registry mismatch, is Phase B work.
+
+## 8. Frontier extensions
+
+**Emergent electromagnetism & Bloch points.** A spin texture acts on conduction
+electrons like a real EM field: the emergent magnetic flux density is $\mathbf b_e =
+\mathbf F/4\pi$ (its in-plane flux per slice is the skyrmion number), and its
+divergence $\nabla\cdot\mathbf b_e$ — zero for any smooth field — is the
+emergent-magnetic-charge (Bloch-point) density. A Bloch point is the hedgehog
+singularity through which topology changes; `topology.bloch_points` / `monopole_density`
+and `current.emergent_field` read these out. Independently, the Hopf invariant *is*
+the linking number of any two preimages, so `topology.linking_number` cross-checks
+$Q_H$ from the real-space loops alone (no FFT gauge machinery).
+
+**Dynamical (FMR) spectrum.** Linearizing the *conservative* LLG about a relaxed
+state, $\dot v = -\gamma\,\mathbf m\times(\mathrm{Hess}\cdot v)$, gives complex
+eigenfrequencies $\pm i\omega$ — the resonance/spin-wave modes (`physics/fmr.py`),
+distinct from the *static* Hessian curvatures of `physics/hessian.py`. The uniform-FM
+anchor recovers the Larmor/Kittel relation $\omega = \gamma H$.
+
+**Spin-orbit torque.** A local current-induced torque $-\tau_{\rm DL}\,\mathbf
+m\times(\mathbf m\times\hat p) - \tau_{\rm FL}\,\mathbf m\times\hat p$ (no spatial
+gradient, unlike Zhang-Li STT) — the damping-like term switches $\mathbf m$ toward
+the polarization $\hat p$ (`physics/sot.py`).
+
+**Differentiable simulation.** With the JAX backend, `physics/autodiff.py`
+re-expresses the local energy so `jax.grad` flows: its field-gradient equals
+$-\mathbf H_{\rm eff}$ to machine precision, and one can differentiate the relaxed
+energy w.r.t. material parameters *through* the compiled relaxation — the basis for
+gradient-based inverse design.
 
 ## References
 

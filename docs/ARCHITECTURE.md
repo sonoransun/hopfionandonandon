@@ -49,6 +49,8 @@ graph BT
 
 Edges point from importer to importee. Bottom of the graph (`backend.py`) has zero internal deps; top (`stability.py`, `viz.py`, `io.py`) sits at the outermost ring of the framework.
 
+This shows the Phase-A core only. The Phase-B/C physics lives under `physics/` (`two_temp`, `dipolar`, `hessian`, `bilayer`, `current`, `composite`, `stt`, `integrators`, `correction`, `high_order`, `string_method`, and the esoteric-round additions `sot` (spin-orbit torque), `fmr` (dynamical eigenspectrum), and `autodiff` (differentiable energy / inverse design)), and the recipe pipeline under `pipeline/` (`recipe`, `runner`, `metrics`, `qc`, `report`, `batch`, `cli`). See [CLAUDE.md](../CLAUDE.md) for the full cross-subpackage dependency graph.
+
 ## 2. Backend dispatch
 
 A single module — `backend.py` — owns the choice of NumPy vs JAX. Every numerical module imports `xp` from it and never from `numpy`/`jax.numpy` directly. Selection is via env var or runtime call:
@@ -66,7 +68,7 @@ sequenceDiagram
   Note over Backend,Module: same code path; jit is identity in numpy mode,<br/>jax.jit in jax mode
 ```
 
-Switching backends mid-run is supported via `hopfion.backend.use("jax")`. The `jit`/`vmap` exports are identity in NumPy mode so production code can stay decorated.
+Switching backends mid-run is supported via `hopfion.backend.use("jax")`. The `jit`/`vmap` exports are identity in NumPy mode so production code can stay decorated. Under the JAX backend, `llg.relax` dispatches the whole damped loop to a compiled `jax.lax.scan` path (`integrators.relax_scan`) when no per-step callback is requested — the callback-driven recipe path stays in Python. JAX defaults to float32; set `jax_enable_x64` for parity with the NumPy reference.
 
 ## 3. Field convention
 

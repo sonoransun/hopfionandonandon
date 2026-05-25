@@ -16,7 +16,7 @@ import numpy as _np
 
 from hopfion.backend import to_numpy
 from hopfion.grid import Grid
-from hopfion.topology import preimage_mask
+from hopfion.topology import preimage_mask, skyrmion_charge_density
 
 
 def slice_quiver(m, grid: Grid, plane: str = "xy", index: Optional[int] = None, stride: int = 2, ax=None):
@@ -59,6 +59,31 @@ def slice_quiver(m, grid: Grid, plane: str = "xy", index: Optional[int] = None, 
     ax.set_xlabel(plane[0])
     ax.set_ylabel(plane[1])
     return ax, q
+
+
+def skyrmion_charge_heatmap(m, grid: Grid, z_index: Optional[int] = None, ax=None, cmap: str = "RdBu_r"):
+    """Heatmap of the 2D skyrmion-charge density on one (x, y) slice.
+
+    Diverging colormap symmetric about zero, so a skyrmion (negative core) and an
+    antiskyrmion (positive core) read as opposite colors. Returns ``(ax, im)``.
+    """
+    import matplotlib.pyplot as plt
+    if z_index is None:
+        z_index = grid.nz // 2
+    rho = to_numpy(skyrmion_charge_density(m, grid))[:, :, z_index]
+    vmax = float(_np.abs(rho).max()) or 1.0
+    extent = [
+        -grid.nx * grid.dx / 2, grid.nx * grid.dx / 2,
+        -grid.ny * grid.dy / 2, grid.ny * grid.dy / 2,
+    ]
+    if ax is None:
+        _, ax = plt.subplots(figsize=(5.4, 4.8))
+    im = ax.imshow(rho.T, origin="lower", extent=extent, cmap=cmap,
+                   vmin=-vmax, vmax=vmax)
+    ax.set_aspect("equal")
+    ax.set_xlabel("x")
+    ax.set_ylabel("y")
+    return ax, im
 
 
 def preimage_scatter(m, grid: Grid, targets=None, tol: float = 0.1, ax=None):

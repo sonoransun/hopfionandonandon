@@ -1,0 +1,50 @@
+name: bilayer_demo
+description: |
+  Twisted-bilayer coupled relaxation. The recipe's `initial` field is layer 1
+  (a Q=1 hopfion); the `bilayer` run-step builds layer 2 (uniform +z by default)
+  and relaxes the two layers together under the moiré-registry interlayer
+  exchange of physics/bilayer.py. Layer 1 is tracked by the usual metrics and
+  returned as the primary field; layer 2 is written to run.h5 as the `m2`
+  dataset. With bilayer_J0 = 0 this reduces to an independent single-layer relax.
+
+grid:
+  nx: 48
+  ny: 48
+  nz: 48
+  dx: 0.3
+  bc: periodic
+
+material:
+  A_ex: 1.0
+  D: 1.5
+  Ku: 0.7
+  easy_axis: [0, 0, 1]
+  H_ext: [0, 0, 0]
+
+initial:
+  kind: hopfion
+  R: 1.5
+  p: 1
+  q: 1
+
+run:
+  - kind: bilayer
+    n_steps: 120
+    dt: 0.002
+    alpha: 0.2
+    bilayer_theta: 0.15
+    bilayer_a: 4.0
+    bilayer_J0: 0.2
+    bilayer_layer2: uniform
+
+qc:
+  fail_on:
+    - norm_drift_below:  {tol: 1.0e-10}
+  warn_on:
+    - hopf_index_within: {target: 1.0, tol: 0.2}
+
+io:
+  out: runs/bilayer_demo/
+
+seed: 0
+backend: numpy

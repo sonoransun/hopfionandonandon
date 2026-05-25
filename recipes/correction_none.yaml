@@ -1,0 +1,50 @@
+name: correction_none
+description: |
+  Baseline for the error-correction comparison: a Q=1 hopfion settled, then
+  driven by a white-noise thermal burst with NO correction. The Hopf index
+  wanders freely. Compare q_hopf.max_drift against correction_active.yaml (same
+  grid / seed / steps, correction on). Demonstrative recipe — QC accepts and the
+  drift is recorded rather than gated.
+
+grid:
+  nx: 40
+  ny: 40
+  nz: 40
+  dx: 0.4
+  bc: periodic
+
+material:
+  A_ex: 1.0
+  D: 1.5
+  Ku: 0.7
+  easy_axis: [0, 0, 1]
+  H_ext: [0, 0, 0]
+
+initial:
+  kind: hopfion
+  R: 1.5
+
+run:
+  - kind: relax
+    n_steps: 30
+    dt: 0.002
+  - kind: thermal_burst
+    n_steps: 80
+    dt: 0.002
+    alpha: 0.1
+    kT: 2.0
+
+correction:
+  kind: none
+
+qc:
+  fail_on:
+    - norm_drift_below:  {tol: 1.0e-10}
+  warn_on:
+    - hopf_index_within: {target: 1.0, tol: 0.2}
+
+io:
+  out: runs/correction_none/
+
+seed: 0
+backend: numpy

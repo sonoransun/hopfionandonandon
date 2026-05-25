@@ -12,8 +12,12 @@ Pluggable in-line metric callbacks. Each `Metric` collects a time-series during 
 | `EnergyMonotonicity` | per-step energy time series |
 | `NormDrift` | per-step `max\|m\|-1` |
 | `HopfIndexDrift` | sub-sampled `Q_H` (default cadence 25) |
+| `SkyrmionChargeDrift` | sub-sampled 2D skyrmion number `N_sk` (extended metrics) |
+| `PerSiteQVoronoi` | per-lattice-site Hopf charge by Voronoi zone (auto-added for `hopfion_array` + extended metrics) |
+| `BlochPointCount` | number of Bloch points (emergent monopoles) over time — flags topological transitions |
 | `Runtime` | wall time per step |
 | `default_metrics(hopf_cadence=25)` | factory returning the standard four |
+| `extended_metrics(...)` | default four + `SkyrmionChargeDrift` + flux/drift/per-site |
 
 ## Cadence
 

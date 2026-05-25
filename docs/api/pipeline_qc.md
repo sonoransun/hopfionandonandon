@@ -19,6 +19,9 @@ Acceptance criteria + verdict aggregation. Criteria read metric summary dicts an
 | `energy_monotonicity` | `energy.max_increase` | `tol` (default 1e-6) |
 | `hopf_index_within` | `q_hopf.Q_final` | `target` (1.0), `tol` (0.05) |
 | `hopf_index_drift_below` | `q_hopf.max_drift` | `tol` (0.1) |
+| `skyrmion_number_within` | `q_skyrmion.N_final` (skip if absent) | `target` (1.0), `tol` (0.1) |
+| `skyrmion_number_drift_below` | `q_skyrmion.max_drift` (skip if absent) | `tol` (0.1) |
+| `per_site_voronoi_health` | `per_site_q_voronoi` (skip if absent) | `min_fidelity` (0.9), `min_abs_q` (0.5) |
 | `norm_drift_below` | `norm_drift.max_drift` | `tol` (1e-10) |
 | `runtime_within` | `runtime.total_seconds` | `max_seconds` (60) |
 | `min_hessian_eigenvalue` | `hessian.min_eig` | `tol` (-1e-6) |

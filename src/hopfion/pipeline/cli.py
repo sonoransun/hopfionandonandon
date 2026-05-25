@@ -60,6 +60,71 @@ def cmd_batch(args) -> int:
     return 0 if report.all_passed else 2
 
 
+_BATTERY = [
+    ("single", "recipes/single_hopfion.yaml"),
+    ("nucleate", "recipes/laser_nucleation_2t.yaml"),
+    ("lattice", "recipes/moire_lattice.yaml"),
+]
+
+
+def cmd_validate(args) -> int:
+    """Grade a candidate (A_ex, D, Ku) against the hopfion stability window.
+
+    Runs the SOP-004 smoke battery (single / nucleate / lattice) with the
+    material substituted, then maps the verdicts to a letter grade.
+    """
+    from hopfion.pipeline.recipe import RecipeConfig
+    from hopfion.pipeline.runner import build_energy_params, build_grid, run
+
+    mat = _parse_material(args.material)
+    A_ex = float(mat.get("A_ex", 1.0))
+    D = float(mat.get("D", 0.0))
+    Ku = float(mat.get("Ku", 0.0))
+    tag = args.material.replace("=", "").replace(",", "_").replace(".", "p")
+    out_root = args.out or f"runs/validation/{tag}"
+
+    print(f"Material: A_ex={A_ex}, D={D}, Ku={Ku}")
+    if D > 0:
+        L_D = A_ex / D
+        Q = D * D / (A_ex * Ku) if Ku > 0 else float("inf")
+        ld_ok = "ok" if 0.55 < L_D < 0.85 else "OUT"
+        q_ok = "ok" if 2.0 < Q < 7.0 else "OUT"
+        print(f"  pre-flight: L_D = {L_D:.3f} [{ld_ok}, target 0.55-0.85]   "
+              f"Q = {Q:.2f} [{q_ok}, target 2.0-7.0]")
+    print()
+
+    passed: dict = {}
+    single_state = None
+    for label, recipe in _BATTERY:
+        rc = RecipeConfig.from_yaml(recipe)
+        for k, v in mat.items():
+            setattr(rc.material, k, v)
+        if args.quick:
+            for st in rc.run:
+                st.n_steps = min(st.n_steps, 50)
+        rc.io.out = f"{out_root}/{label}"
+        rc.io.write_report = False
+        result = run(rc, write=True)
+        passed[label] = (result.qc.verdict == "ACCEPT")
+        print(f"  {label:9s} {recipe:34s} {result.qc.verdict}")
+        if label == "single":
+            single_state = (rc, result.m_final)
+
+    grade = _grade(passed)
+    print(f"\nVALIDATION GRADE: {grade}  ({_GRADE_NOTE[grade]})")
+
+    if args.hessian and single_state is not None and single_state[1] is not None:
+        from hopfion.physics.hessian import lowest_eigenmodes
+        rc_s, m_s = single_state
+        g = build_grid(rc_s)
+        ep = build_energy_params(rc_s, g)
+        res_h = lowest_eigenmodes(m_s, g, ep, k=5)
+        flag = "saddle (not a minimum)" if res_h.min_eig < -1e-3 else "minimum"
+        print(f"  hessian probe (single): min_eig = {res_h.min_eig:+.3e}  [{flag}]")
+
+    return 0 if grade in ("A", "B", "C") else 2
+
+
 def cmd_report(args) -> int:
     from hopfion.pipeline.report import write_report
     p = write_report(args.run_dir)
@@ -140,6 +205,52 @@ def _coerce(v: str):
             return v
 
 
+_GRADE_NOTE = {
+    "A": "sweet spot; proceed to lifetime work",
+    "B": "isolated + lattice work; nucleation marginal",
+    "C": "metastable + nucleates, but lattice doesn't pin",
+    "D": "one-off only; expect lifetime issues",
+    "F": "not in the stability window",
+}
+
+
+def _parse_material(s: str) -> dict:
+    """Parse 'A_ex=1.0,D=1.5,Ku=0.7' into a {param: value} dict."""
+    mat: dict = {}
+    for item in s.split(","):
+        if not item.strip():
+            continue
+        key, _, val = item.partition("=")
+        key = key.strip()
+        if key not in ("A_ex", "D", "Ku"):
+            raise ValueError(f"unknown material parameter {key!r}; expected A_ex, D, or Ku")
+        mat[key] = _coerce(val.strip())
+    if not mat:
+        raise ValueError("no material parameters parsed from --material")
+    return mat
+
+
+def _grade(passed: dict) -> str:
+    """Map battery verdicts {single, nucleate, lattice: bool} to a letter grade.
+
+    ``single`` is the gate: if an isolated hopfion won't hold, the material
+    fails outright (F). Otherwise A = all pass, B = single+lattice (nucleation
+    marginal), C = single+nucleate (lattice doesn't pin), D = single only.
+    """
+    s = passed.get("single", False)
+    n = passed.get("nucleate", False)
+    lat = passed.get("lattice", False)
+    if not s:
+        return "F"
+    if n and lat:
+        return "A"
+    if lat:
+        return "B"
+    if n:
+        return "C"
+    return "D"
+
+
 def _parse_seeds(s: str) -> List[int]:
     """Accept 'a:b', 'a:b:c', or 'a,b,c'."""
     if ":" in s:
@@ -194,6 +305,18 @@ def build_parser() -> argparse.ArgumentParser:
     ls = sub.add_parser("ls", help="list runs and verdicts under a directory")
     ls.add_argument("runs_dir", nargs="?", default="runs")
     ls.set_defaults(func=cmd_ls)
+
+    val = sub.add_parser("validate",
+                         help="grade a candidate material against the stability window")
+    val.add_argument("--material", required=True,
+                     help='material triple, e.g. "A_ex=1.0,D=1.5,Ku=0.7"')
+    val.add_argument("--quick", action="store_true",
+                     help="cap run-step n_steps at 50 (fast; may miss slow topological "
+                          "decay — use full runs for an authoritative grade)")
+    val.add_argument("--hessian", action="store_true",
+                     help="also run a Hessian min-eigenvalue probe on the single-hopfion seed")
+    val.add_argument("--out", default=None, help="output root (default: runs/validation/<material>)")
+    val.set_defaults(func=cmd_validate)
 
     return p
 

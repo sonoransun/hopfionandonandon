@@ -93,8 +93,31 @@ backend: numpy             # numpy | jax
 | `pulse` | Adds a Gaussian field pulse to LLG | `H0`, `t0`, `tau`, `profile`, `pulse_width`, `ring_radius` |
 | `thermal_burst` | Constant-T white-noise sLLG (Phase-A stand-in) | `kT`, `dt`, `n_steps` |
 | `two_temperature` | Phase-B physical nucleation engine | `Te_peak`, `tau`, `t0`, `G_el`, `C_e`, `C_l` |
+| `dynamics_stt` | Zhang-Li spin-transfer-torque LLG (C2) | `u`, `beta`, `gamma`, `alpha`, `dt` |
+| `dynamics_sot` | Spin-orbit-torque LLG (damping-/field-like) | `sot_p`, `sot_dl`, `sot_fl`, `gamma`, `alpha`, `dt` |
+| `ac_drive` | LLG under an oscillatory field $H_{ac}\cos(\omega t)$ (microwave/FMR) | `ac_H0`, `ac_omega`, `gamma`, `alpha`, `dt` |
+| `bilayer` | Twisted-bilayer coupled relaxation; `m` = layer 1, layer 2 from `bilayer_layer2`, written to `run.h5` as `m2` | `bilayer_theta`, `bilayer_a`, `bilayer_J0`, `bilayer_layer2` |
+
+The `dynamics` step honors `integrator: implicit_midpoint` (energy-conserving for
+long-time conservative/precessional runs) in addition to the default Heun.
 
 Multiple steps run in sequence. Example: thermal burst followed by relax = "heat + cooldown" workflow.
+
+### Error correction (root-level `correction:` block)
+
+A recipe may add a top-level `correction:` block; the runner builds a controller
+(`physics.correction.make_controller`) and weaves its corrective field + per-step
+monitor into the H_extra-capable steps (`dynamics` / `pulse` / `thermal_burst`).
+`relax` steps run uncorrected. The tally is written to `metrics.correction`.
+
+```yaml
+correction:
+  kind: active            # none | active | topological_gap | stabilizer
+  target_Q: 1.0           # active: setpoint, threshold, gain, cadence, correction_duration
+  threshold: 0.05
+  gain: 3.0
+  # min_gap (topological_gap);  expected_sites / flip_threshold (stabilizer)
+```
 
 ## Initial-state kinds
 
@@ -104,6 +127,8 @@ Multiple steps run in sequence. Example: thermal burst followed by relax = "heat
 | `perturbed_uniform` | uniform + Gaussian noise | `direction`, `amplitude` |
 | `hopfion` | analytic Hopf ansatz, $Q_H = p\cdot q$ | `R`, `p`, `q`, `center`, `axis` |
 | `hopfion_array` | site-blended ansätze on a 2D/3D lattice | `R`, `array_lattice`, `array_a`, `array_n_rings` (triangular) or `array_nx`, `array_ny` (square) |
+| `skyrmion` | 2D skyrmion/antiskyrmion tube | `skyrmion_radius`, `skyrmion_helicity`, `skyrmion_vorticity` (±1) |
+| `skyrmion_tube` / `hopfion_skyrmion_hybrid` / `q_pair` | composite states | see `physics/composite.py` |
 | `file` | load `m` from an HDF5 file | `file_path` |
 
 ## CLI
@@ -120,6 +145,10 @@ hopfion batch RECIPE --sweep "run[0].dt=0.001,0.002,0.005" --workers 4
 hopfion ls runs/                         # tabulate verdicts
 hopfion report RUN_DIR                   # (re)generate report.md
 hopfion qc RUN_DIR                       # re-evaluate QC criteria
+
+hopfion validate --material A_ex=1.0,D=1.5,Ku=0.7   # SOP-004 smoke battery → A–F grade
+hopfion validate --material ... --quick             # fast (caps steps; approximate)
+hopfion validate --material ... --hessian           # + min-eigenvalue probe
 ```
 
 CLI exit codes: 0 for `ACCEPT`, 2 for `FAIL`. CI workflows rely on this.

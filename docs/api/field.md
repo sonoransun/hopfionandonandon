@@ -15,6 +15,7 @@ graph LR
 | Function | Returns | Purpose |
 |---|---|---|
 | `hopfion(grid, R, p=1, q=1, center=(0,0,0), axis="z")` | $(3, n_x, n_y, n_z)$ | Hopf-fibration ansatz with $Q_H = p \cdot q$ |
+| `skyrmion(grid, radius=1.0, helicity=0.0, vorticity=1, center=(0,0))` | $(3, n_x, n_y, n_z)$ | 2D skyrmion/antiskyrmion tube; `helicity` 0=Néel, π/2=Bloch; `vorticity` ±1 sets the charge sign ($N_{sk}\approx\mp1$) |
 | `uniform(grid, direction=(0,0,1))` | $(3, n_x, n_y, n_z)$ | Constant field (ferromagnetic ground state) |
 | `add_perturbation(m, amplitude=0.01, seed=None)` | $(3, n_x, n_y, n_z)$ | Tangential noise + renormalize |
 

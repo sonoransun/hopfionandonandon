@@ -20,7 +20,7 @@ import numpy as _np
 from hopfion.backend import to_numpy
 from hopfion.energy import EnergyParams, total_energy
 from hopfion.grid import Grid
-from hopfion.topology import hopf_index
+from hopfion.topology import hopf_index, skyrmion_number
 
 
 @dataclass
@@ -122,6 +122,63 @@ class HopfIndexDrift(Metric):
             "Q_final": float(arr[-1]),
             "max_drift": float(_np.max(_np.abs(arr - arr[0]))),
             "n_samples": int(arr.size),
+        }
+
+
+class SkyrmionChargeDrift(Metric):
+    """Track the 2D skyrmion (Pontryagin) number over time.
+
+    The skyrmion analogue of ``HopfIndexDrift``. Cheap (finite-difference,
+    no FFT), so it could run every step, but defaults to the same sub-sampling
+    cadence for symmetry with the Hopf tracker.
+    """
+    name = "q_skyrmion"
+
+    def __init__(self, cadence: int = 25):
+        self.cadence = cadence
+        self.history: List[float] = []
+        self.steps: List[int] = []
+
+    def collect(self, ctx):
+        self.history.append(skyrmion_number(ctx.m, ctx.grid))
+        self.steps.append(ctx.step)
+
+    def summary(self):
+        arr = _np.asarray(self.history)
+        if arr.size == 0:
+            return {"N_initial": 0.0, "N_final": 0.0, "max_drift": 0.0, "n_samples": 0}
+        return {
+            "N_initial": float(arr[0]),
+            "N_final": float(arr[-1]),
+            "max_drift": float(_np.max(_np.abs(arr - arr[0]))),
+            "n_samples": int(arr.size),
+        }
+
+
+class BlochPointCount(Metric):
+    """Track the number of Bloch points (emergent monopoles) over time — the
+    singularities through which topology changes. A clean hopfion has zero;
+    a count spike flags a topological transition."""
+    name = "bloch_points"
+
+    def __init__(self, cadence: int = 25):
+        self.cadence = cadence
+        self.history: List[int] = []
+        self.steps: List[int] = []
+
+    def collect(self, ctx):
+        from hopfion.topology import bloch_points
+        self.history.append(len(bloch_points(ctx.m, ctx.grid)))
+        self.steps.append(ctx.step)
+
+    def summary(self):
+        if not self.history:
+            return {"n_initial": 0, "n_final": 0, "max_count": 0, "n_samples": 0}
+        return {
+            "n_initial": int(self.history[0]),
+            "n_final": int(self.history[-1]),
+            "max_count": int(max(self.history)),
+            "n_samples": len(self.history),
         }
 
 
@@ -275,6 +332,42 @@ class PerSiteQ(Metric):
         }
 
 
+class PerSiteQVoronoi(Metric):
+    """Per-lattice-site Hopf charge by Voronoi-zone integration.
+
+    Unlike ``PerSiteQ`` (which segments charge blobs without reference to the
+    intended lattice), this assigns every cell to its nearest lattice ``site``
+    and integrates ``rho_Q`` per zone. The result is aligned to the fixed site
+    list, so a site that loses its hopfion shows up as a specific zone going to
+    ~0 — the natural signal for stabilizer-style QC.
+    """
+    name = "per_site_q_voronoi"
+
+    def __init__(self, sites, cadence: int = 25):
+        self.sites = list(sites)
+        self.cadence = cadence
+        self.history: List[List[float]] = []
+        self.steps: List[int] = []
+
+    def collect(self, ctx):
+        from hopfion.physics.current import hopf_charge_density, per_site_charges
+        rho = hopf_charge_density(ctx.m, ctx.grid)
+        self.history.append(per_site_charges(rho, ctx.grid, self.sites))
+        self.steps.append(ctx.step)
+
+    def summary(self):
+        if not self.history:
+            return {"n_sites": len(self.sites), "n_snapshots": 0}
+        initial = self.history[0]
+        final = self.history[-1]
+        return {
+            "n_sites": len(self.sites),
+            "n_snapshots": len(self.history),
+            "Q_per_site_initial": initial,
+            "Q_per_site_final": final,
+        }
+
+
 # ---------------------------------------------------------------------------
 # Collector — wraps a list of metrics into one callback
 # ---------------------------------------------------------------------------
@@ -324,6 +417,7 @@ def extended_metrics(hopf_cadence: int = 25, drift_cadence: int = 25) -> List[Me
     Use for composite-state recipes where flux/drift are meaningful."""
     return [
         EnergyMonotonicity(), NormDrift(), HopfIndexDrift(cadence=hopf_cadence),
+        SkyrmionChargeDrift(cadence=hopf_cadence),
         Runtime(),
         FluxAccumulation(cadence=drift_cadence),
         DriftVelocity(cadence=drift_cadence),
@@ -338,10 +432,13 @@ __all__ = [
     "EnergyMonotonicity",
     "NormDrift",
     "HopfIndexDrift",
+    "SkyrmionChargeDrift",
+    "BlochPointCount",
     "Runtime",
     "FluxAccumulation",
     "DriftVelocity",
     "PerSiteQ",
+    "PerSiteQVoronoi",
     "default_metrics",
     "extended_metrics",
 ]

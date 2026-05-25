@@ -1,6 +1,6 @@
 # `hopfion.stability`
 
-Perturbation + lifetime utilities. Phase A: perturb-and-relax test, white-noise thermal lifetime tracker. Phase B will add Hessian eigenmode analysis.
+Perturbation + lifetime utilities: perturb-and-relax test, white-noise thermal lifetime tracker. Hessian eigenmode analysis lives in [`physics/hessian.py`](physics_hessian.md); activation barriers via [`physics/string_method.py`](physics_string_method.md).
 
 ## Public API
 

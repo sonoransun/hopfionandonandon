@@ -20,5 +20,13 @@
     "max_energy_increase": -0.6728309700317823,
     "max_norm_drift": 3.3306690738754696e-16,
     "verdict": "ACCEPT"
+  },
+  "skyrmion_tube": {
+    "recipe": "recipes/regression/skyrmion_tube.yaml",
+    "Q_final": 0.0,
+    "E_final": -269.22592853778815,
+    "max_energy_increase": -0.12060818461634426,
+    "max_norm_drift": 2.220446049250313e-16,
+    "verdict": "ACCEPT"
   }
 }

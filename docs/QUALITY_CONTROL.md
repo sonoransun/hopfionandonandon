@@ -37,10 +37,24 @@ Each metric collects a time series and emits a summary dict that QC criteria rea
 - **Summary**: `Q_initial`, `Q_final`, `max_drift`.
 - **Use cases**: topological invariance under dynamics; final-Q acceptance vs target.
 
+### `q_skyrmion` (extended)
+- **Collects**: `skyrmion_number(m, grid)` every N steps (default 25). Cheap (finite-difference, no FFT). Part of `extended_metrics`, so enable `io.extended_metrics: true`.
+- **Summary**: `N_initial`, `N_final`, `max_drift`, `n_samples`.
+- **Use cases**: 2D skyrmion-charge invariance under dynamics; final-$N_{sk}$ acceptance vs target (skyrmion $\approx -1$, antiskyrmion $\approx +1$).
+
 ### `runtime`
 - **Collects**: wall time per step.
 - **Summary**: `total_seconds`, `mean_step_ms`, `p95_step_ms`.
 - **Use cases**: performance regression sentinel.
+
+### `per_site_q_voronoi` (extended, lattice runs)
+- **Collects**: per-lattice-site Hopf charge by Voronoi-zone integration (`current.per_site_charges`). Auto-added by the runner when `initial.kind == hopfion_array` and `io.extended_metrics`.
+- **Summary**: `n_sites`, `Q_per_site_initial`, `Q_per_site_final`.
+- **Use cases**: which specific site lost its hopfion (the centroid-based `per_site_q` doesn't tie blobs to sites).
+
+### `correction` (when a `correction:` block is present)
+- **Collects**: the controller's running tally (not a per-step metric).
+- **Summary**: `kind`, `n_corrections`, `final_fidelity`, `n_events`, and `preflight` (topological_gap only).
 
 ### `hessian` (B3, opt-in)
 - **Collects**: not collected automatically; populated by a `lowest_eigenmodes` call (e.g. at end of relax).
@@ -55,9 +69,12 @@ Recipe key `criterion_name: {param: value}`. Defaults below.
 | `energy_monotonicity` | `energy.max_increase` | `max_increase < tol` | 1e-6 |
 | `hopf_index_within` | `q_hopf.Q_final` | `\|Q_final - target\| < tol` | target=1, tol=0.05 |
 | `hopf_index_drift_below` | `q_hopf.max_drift` | `max_drift < tol` | 0.1 |
+| `skyrmion_number_within` | `q_skyrmion.N_final` (if collected) | `\|N_final - target\| < tol` | target=1, tol=0.1 |
+| `skyrmion_number_drift_below` | `q_skyrmion.max_drift` (if collected) | `max_drift < tol` | 0.1 |
 | `norm_drift_below` | `norm_drift.max_drift` | `max_drift < tol` | 1e-10 |
 | `runtime_within` | `runtime.total_seconds` | `total < max_seconds` | 60 |
 | `min_hessian_eigenvalue` | `hessian.min_eig` (if collected) | `min_eig ≥ tol` | -1e-6 |
+| `per_site_voronoi_health` | `per_site_q_voronoi` (if collected) | fraction of occupied sites keeping `\|Q\| ≥ min_abs_q` `≥ min_fidelity` | min_fidelity=0.9, min_abs_q=0.5 |
 
 Severity is set per-criterion via the recipe lists: `fail_on:` makes it a tripwire; `warn_on:` lets it record without flipping the verdict.
 
@@ -68,6 +85,7 @@ These run *before* the simulation starts. A failure aborts the run (no LLG steps
 | Check | Implementation | Why |
 |---|---|---|
 | Grid resolution | `max(dx, dy, dz) ≤ R/2` for hopfion ansatz | a hopfion of size $R$ resolved on fewer than ~5 cells per radius has unreliable topology |
+| Skyrmion resolution | `max(dx, dy) ≤ radius/2` for skyrmion / skyrmion_tube | an under-resolved skyrmion under-counts $N_{sk}$ |
 | Periodic box size | `min(nx·dx, …) > 4R` | avoid periodic-image overlap of the hopfion |
 | Exchange-stability dt | `dt ≤ dx² / (4 A_ex)` | explicit Heun is unstable above this |
 | Backend availability | importable `jax` if `backend: jax` requested | catch a "missing dep" failure at the recipe stage |

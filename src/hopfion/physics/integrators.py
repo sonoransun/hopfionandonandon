@@ -117,3 +117,60 @@ def damped_step(m, grid: Grid, ep: EnergyParams, dt: float = 0.01,
     mxH = _cross(m, H)
     rhs = -_cross(m, mxH)
     return normalize(m + dt * rhs)
+
+
+def implicit_midpoint_step(m, grid: Grid, ep: EnergyParams, gamma: float, alpha: float,
+                           dt: float, H_extra: Optional[Callable] = None, iters: int = 4):
+    """Implicit-midpoint LLG step: ``m* = m + dt·rhs((m+m*)/2)``, solved by a few
+    fixed-point iterations, then renormalized.
+
+    The midpoint rule is (near-)symplectic, so its great advantage is **long-time
+    energy behavior in conservative dynamics**: with damping off (``alpha=0``),
+    explicit Heun's energy drifts secularly and eventually diverges, whereas this
+    integrator's energy stays bounded over thousands of steps — the right tool for
+    spin-wave / precessional studies. (It is solved by fixed-point iteration, not
+    Newton, so it is *not* unconditionally A-stable: ``dt`` must stay within the
+    fixed-point convergence radius, comparable to the explicit stability limit.)
+    At small ``dt`` it agrees with ``heun_step`` to 2nd order.
+    """
+    m_next = m
+    for _ in range(iters):
+        m_mid = normalize(0.5 * (m + m_next))
+        H = _effective_with_extra(m_mid, grid, ep, H_extra)
+        k = llg_rhs(m_mid, H, gamma, alpha)
+        m_next = normalize(m + dt * k)
+    return m_next
+
+
+def relax_scan(m, grid: Grid, ep: EnergyParams, n_steps: int, dt: float = 0.01):
+    """JAX-compiled damped relaxation via ``jax.lax.scan``.
+
+    The whole ``n_steps`` loop is fused into one traced/compiled kernel — no
+    per-step Python overhead and no callbacks (``scan`` cannot call back into
+    Python, which is exactly why ``llg.relax`` only takes this path when
+    ``step_callback`` is None). All per-step ops (``damped_step`` →
+    ``effective_field`` → grid stencils) are already pure ``xp()`` arithmetic, so
+    they trace cleanly under the jax backend. Requires ``backend.name()=='jax'``.
+    """
+    import jax
+
+    def body(carry, _):
+        return damped_step(carry, grid, ep, dt=dt), None
+
+    m_final, _ = jax.lax.scan(body, m, xs=None, length=int(n_steps))
+    return m_final
+
+
+def integrate_scan(m, grid: Grid, ep: EnergyParams, gamma: float, alpha: float,
+                   n_steps: int, dt: float):
+    """JAX-compiled *precessional* LLG dynamics via ``jax.lax.scan`` over
+    ``heun_step`` (no ``H_extra``/callbacks). The full-dynamics analogue of
+    ``relax_scan``; ``llg.integrate`` dispatches here under the jax backend when
+    no transient field, snapshots, or per-step hook is requested."""
+    import jax
+
+    def body(carry, _):
+        return heun_step(carry, grid, ep, gamma, alpha, dt), None
+
+    m_final, _ = jax.lax.scan(body, m, xs=None, length=int(n_steps))
+    return m_final

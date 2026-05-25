@@ -90,6 +90,44 @@ def _complex_pow(re, im, n: int):
     return rn * np.cos(n * theta), rn * np.sin(n * theta)
 
 
+def skyrmion(
+    grid: Grid,
+    radius: float = 1.0,
+    helicity: float = 0.0,
+    vorticity: int = 1,
+    center: Tuple[float, float] = (0.0, 0.0),
+):
+    """A 2D skyrmion texture extruded along z.
+
+    Parameters
+    ----------
+    radius : float
+        Size of the 360-degree domain wall in the in-plane radius ``rho``.
+    helicity : float
+        Rotates the in-plane spin direction: ``0`` is Néel, ``pi/2`` is Bloch.
+    vorticity : int
+        Winding of the in-plane angle. ``+1`` is a skyrmion; ``-1`` is an
+        antiskyrmion (its topological charge has the opposite sign).
+    center : tuple of float
+        In-plane center ``(cx, cy)``.
+
+    Profile: ``theta(rho) = pi * exp(-rho^2 / 2 radius^2)`` so ``m = -z`` at the
+    core and ``m = +z`` in the background. Returns shape ``(3, nx, ny, nz)``.
+    """
+    np = xp()
+    X, Y, _Z = grid.coords()
+    cx, cy = center
+    rho = np.sqrt((X - cx) ** 2 + (Y - cy) ** 2)
+    phi = np.arctan2(Y - cy, X - cx)
+    theta = np.pi * np.exp(-rho * rho / (2.0 * radius * radius))
+    m_rho = np.sin(theta)
+    m_z = np.cos(theta)
+    angle = vorticity * phi + helicity
+    m_x = m_rho * np.cos(angle)
+    m_y = m_rho * np.sin(angle)
+    return np.stack([m_x, m_y, m_z], axis=0)
+
+
 def uniform(grid: Grid, direction=(0.0, 0.0, 1.0)):
     """Uniform magnetization (e.g. ferromagnetic ground state)."""
     np = xp()

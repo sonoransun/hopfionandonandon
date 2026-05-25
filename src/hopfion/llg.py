@@ -63,7 +63,16 @@ def relax(m, grid: Grid, ep: EnergyParams, n_steps: int = 1000, dt: float = 0.01
 
     ``step_callback(m, k)`` -- if supplied, called after each step with the new
     field and the step index. Pipeline metric callbacks attach here.
+
+    Under the JAX backend, when no per-step hook is requested (``step_callback``
+    is None and ``log_every`` is 0), the whole loop is dispatched to a compiled
+    ``jax.lax.scan`` path (``integrators.relax_scan``) for a large speedup.
     """
+    from hopfion.backend import name as _backend_name
+    if step_callback is None and not log_every and _backend_name() == "jax":
+        from hopfion.physics.integrators import relax_scan
+        return relax_scan(m, grid, ep, n_steps, dt)
+
     from hopfion.energy import total_energy
     for k in range(n_steps):
         m = relax_step(m, grid, ep, dt=dt)
@@ -89,7 +98,17 @@ def integrate(
     ``H_extra(m, t)`` is a transient external field. ``step_callback(m, k, t)``
     is invoked after each step (pipeline metrics hook here). If
     ``snapshot_every > 0``, returns ``(m_final, snapshots, times)``.
+
+    Under the JAX backend, a plain dynamics run (no transient field, snapshots, or
+    callback) is dispatched to the compiled ``jax.lax.scan`` path
+    ``integrators.integrate_scan``.
     """
+    from hopfion.backend import name as _backend_name
+    if (H_extra is None and step_callback is None and not snapshot_every
+            and _backend_name() == "jax"):
+        from hopfion.physics.integrators import integrate_scan
+        return integrate_scan(m, grid, ep, lp.gamma, lp.alpha, n_steps, lp.dt)
+
     snapshots = [m.copy() if hasattr(m, "copy") else m] if snapshot_every else None
     times = [0.0] if snapshot_every else None
     t = 0.0

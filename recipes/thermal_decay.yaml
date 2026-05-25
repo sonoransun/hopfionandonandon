@@ -1,0 +1,50 @@
+name: thermal_decay
+description: |
+  Sustained thermal aging of an isolated hopfion with no correction — the
+  decay reference for the error-correction comparison and for lifetime studies
+  (SOP-003). A settled Q=1 hopfion is held under a prolonged white-noise burst;
+  the Hopf index erodes over time. Demonstrative recipe: QC accepts and records
+  the drift rather than gating on it.
+
+grid:
+  nx: 40
+  ny: 40
+  nz: 40
+  dx: 0.4
+  bc: periodic
+
+material:
+  A_ex: 1.0
+  D: 1.5
+  Ku: 0.7
+  easy_axis: [0, 0, 1]
+  H_ext: [0, 0, 0]
+
+initial:
+  kind: hopfion
+  R: 1.5
+
+run:
+  - kind: relax
+    n_steps: 30
+    dt: 0.002
+  - kind: thermal_burst
+    n_steps: 150
+    dt: 0.002
+    alpha: 0.1
+    kT: 4.0
+
+correction:
+  kind: none
+
+qc:
+  fail_on:
+    - norm_drift_below:  {tol: 1.0e-10}
+  warn_on:
+    - hopf_index_within: {target: 1.0, tol: 0.3}
+
+io:
+  out: runs/thermal_decay/
+
+seed: 0
+backend: numpy

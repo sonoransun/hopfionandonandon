@@ -32,7 +32,7 @@ from hopfion.topology import preimage_mask
 # its skyrmion charge (z-slice integration). Each site should show Q_skyrm_z = ±1.
 ```
 
-A scriptable wrapper for per-site Q is on the Phase-C wish-list; for now, eyeball `figs/final_xy.png`.
+Per-site Q is now scriptable: `current.per_site_charges(rho_Q, grid, sites)` integrates the Hopf-charge density over each site's Voronoi zone, and a `hopfion_array` recipe with `io.extended_metrics: true` auto-collects the `per_site_q_voronoi` metric (gradeable via the `per_site_voronoi_health` QC criterion — see `recipes/moire_lattice.yaml`).
 
 ## Yield characterization
 

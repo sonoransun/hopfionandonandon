@@ -102,20 +102,12 @@ def skyrmion_tube(
     m = +ẑ.
 
     The ``helicity`` knob rotates the in-plane spin direction (Bloch vs Néel).
+
+    Thin wrapper over :func:`hopfion.field.skyrmion` with ``vorticity=+1``; kept
+    for the composite-state vocabulary (``q_pair``, ``hopfion_skyrmion_hybrid``).
     """
-    np = xp()
-    X, Y, _Z = grid.coords()
-    cx, cy = center_xy
-    rho = np.sqrt((X - cx) ** 2 + (Y - cy) ** 2)
-    phi = np.arctan2(Y - cy, X - cx)
-    theta = np.pi * np.exp(-rho * rho / (2 * radius * radius))   # cos(theta) profile
-    # Equivalently: theta(rho) goes from π at center to 0 at infinity
-    m_rho = np.sin(theta)
-    m_z = np.cos(theta)
-    # In-plane direction at angle phi + helicity (Bloch = π/2, Néel = 0)
-    m_x = m_rho * np.cos(phi + helicity)
-    m_y = m_rho * np.sin(phi + helicity)
-    return np.stack([m_x, m_y, m_z], axis=0)
+    from hopfion.field import skyrmion
+    return skyrmion(grid, radius=radius, helicity=helicity, vorticity=1, center=center_xy)
 
 
 def hopfion_skyrmion_hybrid(

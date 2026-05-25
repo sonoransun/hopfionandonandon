@@ -28,7 +28,7 @@ import numpy as np
 from matplotlib.animation import FuncAnimation, PillowWriter
 
 from hopfion.energy import EnergyParams, total_energy
-from hopfion.field import hopfion, uniform
+from hopfion.field import hopfion, skyrmion, uniform
 from hopfion.grid import Grid
 from hopfion.laser import GaussianPulse
 from hopfion.lattice import array_hopfion, triangular_sites_2d
@@ -41,7 +41,8 @@ from hopfion.topology import (
     hopf_index,
     preimage_mask,
 )
-from hopfion.viz import slice_quiver
+from hopfion.topology import skyrmion_number
+from hopfion.viz import skyrmion_charge_heatmap, slice_quiver
 
 SEED = 0
 ASSETS = REPO / "docs" / "assets"
@@ -702,6 +703,24 @@ def _render_preimage_rings(m, grid, out_path, title=""):
     plotter.close()
 
 
+def make_skyrmion_charge(out_path):
+    """Skyrmion vs antiskyrmion: in-plane texture (quiver) + Pontryagin charge
+    density (heatmap). The two differ only in vorticity, which flips N_sk."""
+    g = Grid(64, 64, 16, 0.3, 0.3, 0.3, "periodic")
+    fig, axes = plt.subplots(2, 2, figsize=(11.0, 9.6))
+    for row, vort, name in [(0, +1, "Skyrmion"), (1, -1, "Antiskyrmion")]:
+        m = skyrmion(g, radius=1.5, helicity=np.pi / 2, vorticity=vort)
+        N = skyrmion_number(m, g)
+        slice_quiver(m, g, plane="xy", stride=2, ax=axes[row, 0])
+        axes[row, 0].set_title(f"{name}: m (color = m$_z$)")
+        _, im = skyrmion_charge_heatmap(m, g, ax=axes[row, 1])
+        fig.colorbar(im, ax=axes[row, 1], fraction=0.046, pad=0.04, label=r"$q_{sk}$")
+        axes[row, 1].set_title(f"{name}: charge density  (N$_{{sk}}$ = {N:+.2f})")
+    fig.suptitle("2D skyrmion charge as a first-class invariant", y=0.99)
+    fig.tight_layout()
+    _save(fig, out_path)
+
+
 # -----------------------------------------------------------------------------
 # Driver
 # -----------------------------------------------------------------------------
@@ -724,6 +743,7 @@ ASSETS_PLAN = [
     ("stt_drift.gif", make_stt_drift_gif),
     ("correction_comparison.png", make_correction_comparison),
     ("process_window.png", make_process_window),
+    ("skyrmion_charge.png", make_skyrmion_charge),
 ]
 
 

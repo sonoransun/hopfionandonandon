@@ -106,17 +106,25 @@ Each image below is reproducible from a recipe under `recipes/` or directly from
 
 *The same noise-injected run executed under four scenarios: uncorrected (gray dashed), active feedback (green solid), and two passive strategies (blue / purple) shown for illustration. Active feedback measures Q$_H$ every 20 steps and applies a corrective Zeeman pulse on excursion past threshold — the green curve stays nailed to the target Q=1. The three correction strategies in [`hopfion.physics.correction`](src/hopfion/physics/correction.py) — active feedback, topological-gap engineering, stabilizer-style coding — each have characteristic strengths. See [docs/ERROR_CORRECTION.md](docs/ERROR_CORRECTION.md) for the side-by-side comparison protocol.*
 
+### Phase C · 2D skyrmion charge, a first-class invariant
+
+<img src="docs/assets/skyrmion_charge.png" width="720" alt="Skyrmion vs antiskyrmion: in-plane texture and Pontryagin charge density" />
+
+*A skyrmion (top, $N_{sk}\approx-1$) and an antiskyrmion (bottom, $N_{sk}\approx+1$) — the same texture differing only in **vorticity**, which flips the topological charge. Left: the in-plane spin field (color = m$_z$); right: the pointwise Pontryagin charge density. The 2D skyrmion number is tracked end-to-end like the Hopf index — a `field.skyrmion` constructor, a `topology.skyrmion_number` invariant, a `q_skyrmion` metric, and `skyrmion_number_within` / `_drift_below` QC criteria. Recipe: `recipes/skyrmion_tube.yaml`.*
+
 ## What you can do with this
 
 Concrete user stories, each tied to a recipe and a Standard Operating Procedure:
 
 - **Reproduce the May-2026 laser-nucleation result** → `recipes/laser_nucleation_2t.yaml` + [SOP-001](docs/sop/NUCLEATE_HOPFION.md). The two-temperature stochastic LLG produces a Q$_H$=1 hopfion from a uniform initial state, yields characterized over a fluence sweep.
 - **Characterize a moiré-stabilized hopfion lattice** → `recipes/moire_lattice.yaml` + [SOP-002](docs/sop/CHARACTERIZE_LATTICE.md). Seven-site triangular array with per-site Q tracking.
-- **Estimate the thermal lifetime of a hopfion** → [SOP-003](docs/sop/ESTIMATE_LIFETIME.md). Two methods: direct stochastic-LLG aging and Hessian-eigenmode Arrhenius pre-factor.
-- **Validate a candidate material against the stability window** → [SOP-004](docs/sop/VALIDATE_NEW_MATERIAL.md). Given (A, D, K), run a 3-recipe smoke battery + Hessian probe; grade A–F.
+- **Estimate the thermal lifetime of a hopfion** → [SOP-003](docs/sop/ESTIMATE_LIFETIME.md). Direct stochastic-LLG aging, or a Hessian-eigenmode Arrhenius pre-factor combined with a string-method activation barrier (`hopfion.physics.string_method`).
+- **Validate a candidate material against the stability window** → `hopfion validate --material A_ex=1.0,D=1.5,Ku=0.7` + [SOP-004](docs/sop/VALIDATE_NEW_MATERIAL.md). Runs the 3-recipe smoke battery and grades A–F (`--hessian` adds a stability probe).
 - **Drive a hopfion via spin-transfer torque** → `recipes/flux_q_pair.yaml` or `recipes/stt_lattice.yaml` + [SOP-005](docs/sop/DRIVE_HOPFION.md). Verifies drift velocity matches Zhang-Li theory.
 - **Build a hopfion-skyrmion hybrid** → `recipes/hopfion_skyrmion_hybrid.yaml` + [SOP-006](docs/sop/BUILD_COMPOSITE.md). Constructs the threaded composite, verifies topology before propagation.
-- **Protect a composite against thermal drift** → [SOP-007](docs/sop/PROTECT_COMPOSITE.md). Compares three correction strategies (`damping_boost`, `field_pulse`, `surgical_resync` in [`hopfion.physics.correction`](src/hopfion/physics/correction.py)) on the same injected noise.
+- **Nucleate and track a skyrmion (or antiskyrmion)** → `recipes/skyrmion_tube.yaml`. Relaxes a 2D skyrmion and tracks its Pontryagin number $N_{sk}$ as a first-class invariant; flip `initial.skyrmion_vorticity` to `-1` for an antiskyrmion.
+- **Protect a composite against thermal drift** → `recipes/correction_{none,active,topological_gap,stabilizer}.yaml` + [SOP-007](docs/sop/PROTECT_COMPOSITE.md). A root-level `correction:` block weaves a controller (`active` / `topological_gap` / `stabilizer` in [`hopfion.physics.correction`](src/hopfion/physics/correction.py)) into the LLG loop; compare `Q_H` against the no-correction baseline.
+- **Couple twisted bilayers** → `recipes/bilayer_demo.yaml`. A `kind: bilayer` run-step relaxes two moiré-coupled layers; layer 2 is written to `run.h5` as `m2`.
 
 ## Quickstart
 
@@ -239,7 +247,7 @@ hopfionandonandon/
 ├── docs/                        # PHYSICS, ARCHITECTURE, PIPELINE, QC, FLUX, CORRECTION
 │   ├── sop/                     # 7 Standard Operating Procedures
 │   ├── api/                     # 28 per-module reference pages
-│   └── assets/                  # generated images + GIFs (18 files)
+│   └── assets/                  # generated images + GIFs (19 files)
 ├── scripts/
 │   └── generate_docs_assets.py  # regenerates every asset reproducibly
 ├── .github/workflows/           # tests, lint, regression, benchmarks

@@ -41,10 +41,12 @@ qc:
     - hopf_index_within:      {target: 7.0, tol: 0.3}
     - norm_drift_below:       {tol: 1.0e-10}
   warn_on:
-    - runtime_within:         {max_seconds: 180}
+    - runtime_within:           {max_seconds: 180}
+    - per_site_voronoi_health:  {min_fidelity: 0.9}
 
 io:
   out: runs/moire_lattice_7/
+  extended_metrics: true
 
 seed: 0
 backend: numpy

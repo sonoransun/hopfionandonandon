@@ -71,6 +71,11 @@ class InitialStateSpec:
         - "uniform": constant field along `direction`
         - "perturbed_uniform": uniform + small Gaussian noise (`amplitude`)
         - "hopfion_array": triangular/square sites with R per-site
+        - "skyrmion": 2D skyrmion/antiskyrmion tube (skyrmion_radius,
+          skyrmion_helicity, skyrmion_vorticity; +1 skyrmion / -1 antiskyrmion)
+        - "skyrmion_tube": legacy alias for a +1 skyrmion tube
+        - "hopfion_skyrmion_hybrid": hopfion linked with a skyrmion tube
+        - "q_pair": two opposite-charge hopfions
         - "file": load m from an HDF5 path
     """
     kind: str = "uniform"
@@ -90,8 +95,9 @@ class InitialStateSpec:
     # Composite-state-only (C2)
     separation: float = 4.0          # for q_pair
     axis_of_separation: str = "x"
-    skyrmion_radius: float = 1.0     # for hopfion_skyrmion_hybrid
+    skyrmion_radius: float = 1.0     # for skyrmion / hopfion_skyrmion_hybrid
     skyrmion_helicity: float = 1.5707963267948966  # π/2 (Bloch)
+    skyrmion_vorticity: int = 1      # +1 skyrmion, -1 antiskyrmion (for "skyrmion")
 
 
 @dataclass
@@ -105,6 +111,10 @@ class RunStep:
         - "pulse":           add a Gaussian field pulse for the duration
         - "two_temperature": two-temperature stochastic LLG (B2)
         - "dynamics_stt":    LLG augmented with Zhang-Li spin-transfer torque (C2)
+        - "dynamics_sot":    LLG augmented with spin-orbit torque (damping-/field-like)
+        - "ac_drive":        LLG under an oscillatory field H_ac·cos(ω t)
+        - "bilayer":         twisted-bilayer coupled relaxation (current m = layer 1;
+                             layer 2 built from `bilayer_layer2`, written to run.h5)
     """
     kind: str
     n_steps: int = 0
@@ -127,12 +137,26 @@ class RunStep:
     # STT-only fields (C2)
     u: Tuple[float, float, float] = (0.0, 0.0, 0.0)
     beta: float = 0.0
+    # SOT-only fields
+    sot_p: Tuple[float, float, float] = (0.0, 0.0, 1.0)
+    sot_dl: float = 0.0
+    sot_fl: float = 0.0
+    # AC-drive-only fields
+    ac_H0: Tuple[float, float, float] = (0.0, 0.0, 0.0)
+    ac_omega: float = 1.0
     # Integrator selection (C3)
     integrator: str = "heun"   # "heun" | "rk4" | "crouch_grossman_rk4"
+    # Bilayer-only fields
+    bilayer_theta: float = 0.1     # twist angle (radians)
+    bilayer_a: float = 4.0         # intra-layer lattice constant
+    bilayer_J0: float = 0.3        # interlayer-exchange strength
+    bilayer_layer2: str = "uniform"  # "uniform" | "same" | "hopfion"
 
     def __post_init__(self):
         self.H0 = tuple(self.H0)
         self.u = tuple(self.u)
+        self.sot_p = tuple(self.sot_p)
+        self.ac_H0 = tuple(self.ac_H0)
 
 
 @dataclass
@@ -144,6 +168,30 @@ class QCSpec:
     """
     fail_on: List[dict] = field(default_factory=list)
     warn_on: List[dict] = field(default_factory=list)
+
+
+@dataclass
+class CorrectionSpec:
+    """Error-correction controller configuration (root-level `correction:` block).
+
+    ``kind`` picks the strategy in ``hopfion.physics.correction``; the remaining
+    fields are that strategy's tuning parameters (only the relevant subset is
+    forwarded per kind). ``kind: none`` disables correction.
+    """
+    kind: str = "none"            # "none" | "active" | "topological_gap" | "stabilizer"
+    # active feedback
+    target_Q: float = 1.0
+    threshold: float = 0.1
+    gain: float = 1.0
+    cadence: int = 25
+    correction_duration: int = 5
+    # topological-gap
+    min_gap: float = 0.01
+    # stabilizer
+    expected_sites: int = 7
+    flip_threshold: float = 0.5
+    re_nucleation_kT: float = 8.0
+    re_nucleation_steps: int = 40
 
 
 @dataclass
@@ -163,6 +211,7 @@ class RecipeConfig:
     run: List[RunStep]
     qc: QCSpec = field(default_factory=QCSpec)
     io: IOSpec = field(default_factory=IOSpec)
+    correction: CorrectionSpec = field(default_factory=CorrectionSpec)
     description: str = ""
     seed: int = 0
     backend: str = "numpy"
@@ -188,6 +237,7 @@ class RecipeConfig:
             run = [RunStep(**rs) for rs in data["run"]]
             qc = QCSpec(**data.get("qc", {}))
             io_spec = IOSpec(**data.get("io", {}))
+            correction = CorrectionSpec(**data.get("correction", {}))
             return cls(
                 name=data["name"],
                 grid=grid,
@@ -196,6 +246,7 @@ class RecipeConfig:
                 run=run,
                 qc=qc,
                 io=io_spec,
+                correction=correction,
                 description=data.get("description", ""),
                 seed=int(data.get("seed", 0)),
                 backend=data.get("backend", "numpy"),
@@ -240,6 +291,14 @@ def preflight(rc: RecipeConfig) -> PreflightResult:
                 f"box {L} too small for R={R} under periodic BC; need L > 4R "
                 f"in each direction to avoid image overlap")
 
+    # Skyrmion resolution sanity vs tube radius (in-plane only)
+    if rc.initial.kind in ("skyrmion", "skyrmion_tube"):
+        r = rc.initial.skyrmion_radius
+        if max(g.dx, g.dy) > r / 2.0:
+            failures.append(
+                f"in-plane spacing max({g.dx},{g.dy}) > radius/2 ({r/2:.3f}) -- "
+                f"skyrmion of radius {r} is under-resolved")
+
     # Time-step stability (rough, conservative)
     for i, step in enumerate(rc.run):
         if step.kind in ("relax", "dynamics", "two_temperature"):
@@ -277,6 +336,7 @@ __all__ = [
     "RunStep",
     "QCSpec",
     "IOSpec",
+    "CorrectionSpec",
     "RecipeConfig",
     "PreflightResult",
     "preflight",

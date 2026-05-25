@@ -91,6 +91,45 @@ class HopfIndexDriftBelowCriterion(Criterion):
         )
 
 
+class SkyrmionNumberWithinCriterion(Criterion):
+    """Skyrmion analogue of ``hopf_index_within``. Skips if ``q_skyrmion`` was
+    not collected (e.g. extended_metrics off)."""
+    name = "skyrmion_number_within"
+
+    def evaluate(self, s):
+        target = float(self.params.get("target", 1.0))
+        tol = float(self.params.get("tol", 0.1))
+        sk = s.get("q_skyrmion", {})
+        if not sk or "N_final" not in sk:
+            return CriterionResult(name=self.name, passed=True, severity=self.severity,
+                                   message="q_skyrmion metric not collected (skipped)")
+        n_final = float(sk["N_final"])
+        passed = abs(n_final - target) < tol
+        return CriterionResult(
+            name=self.name, passed=passed, severity=self.severity,
+            measured=n_final, threshold=tol,
+            message=f"N_sk final = {n_final:+.4f} vs target {target} (tol {tol})",
+        )
+
+
+class SkyrmionNumberDriftBelowCriterion(Criterion):
+    name = "skyrmion_number_drift_below"
+
+    def evaluate(self, s):
+        tol = float(self.params.get("tol", 0.1))
+        sk = s.get("q_skyrmion", {})
+        if not sk or "max_drift" not in sk:
+            return CriterionResult(name=self.name, passed=True, severity=self.severity,
+                                   message="q_skyrmion metric not collected (skipped)")
+        max_drift = float(sk["max_drift"])
+        passed = max_drift < tol
+        return CriterionResult(
+            name=self.name, passed=passed, severity=self.severity,
+            measured=max_drift, threshold=tol,
+            message=f"max N_sk drift = {max_drift:.4f} (tol {tol})",
+        )
+
+
 class NormDriftBelowCriterion(Criterion):
     name = "norm_drift_below"
 
@@ -213,18 +252,50 @@ class SyndromeHealthCriterion(Criterion):
         )
 
 
+class PerSiteVoronoiHealthCriterion(Criterion):
+    """Lattice fidelity from the Voronoi per-site charge: fraction of sites that
+    kept |Q| above ``min_abs_q`` from start to finish. Skips if not collected."""
+    name = "per_site_voronoi_health"
+
+    def evaluate(self, s):
+        min_fidelity = float(self.params.get("min_fidelity", 0.9))
+        min_abs_q = float(self.params.get("min_abs_q", 0.5))
+        ps = s.get("per_site_q_voronoi", {})
+        if not ps or "Q_per_site_final" not in ps:
+            return CriterionResult(name=self.name, passed=True, severity=self.severity,
+                                   message="per_site_q_voronoi metric not collected (skipped)")
+        initial = ps.get("Q_per_site_initial", [])
+        final = ps.get("Q_per_site_final", [])
+        occupied = [i for i, q in enumerate(initial) if abs(q) >= min_abs_q]
+        if not occupied:
+            return CriterionResult(name=self.name, passed=True, severity=self.severity,
+                                   message="no occupied sites initially")
+        kept = sum(1 for i in occupied if i < len(final) and abs(final[i]) >= min_abs_q)
+        fidelity = kept / len(occupied)
+        passed = fidelity >= min_fidelity
+        return CriterionResult(
+            name=self.name, passed=passed, severity=self.severity,
+            measured=float(fidelity), threshold=float(min_fidelity),
+            message=f"per-site Voronoi fidelity = {fidelity:.2%} "
+                    f"({kept}/{len(occupied)} sites, min {min_fidelity:.0%})",
+        )
+
+
 # Registry: YAML key -> class
 
 CRITERIA: Dict[str, Type[Criterion]] = {
     EnergyMonotonicityCriterion.name: EnergyMonotonicityCriterion,
     HopfIndexWithinCriterion.name: HopfIndexWithinCriterion,
     HopfIndexDriftBelowCriterion.name: HopfIndexDriftBelowCriterion,
+    SkyrmionNumberWithinCriterion.name: SkyrmionNumberWithinCriterion,
+    SkyrmionNumberDriftBelowCriterion.name: SkyrmionNumberDriftBelowCriterion,
     NormDriftBelowCriterion.name: NormDriftBelowCriterion,
     RuntimeWithinCriterion.name: RuntimeWithinCriterion,
     MinHessianEigenvalueCriterion.name: MinHessianEigenvalueCriterion,
     FluxDivergenceBelowCriterion.name: FluxDivergenceBelowCriterion,
     DriftBoundCriterion.name: DriftBoundCriterion,
     SyndromeHealthCriterion.name: SyndromeHealthCriterion,
+    PerSiteVoronoiHealthCriterion.name: PerSiteVoronoiHealthCriterion,
 }
 
 
@@ -325,6 +396,8 @@ __all__ = [
     "EnergyMonotonicityCriterion",
     "HopfIndexWithinCriterion",
     "HopfIndexDriftBelowCriterion",
+    "SkyrmionNumberWithinCriterion",
+    "SkyrmionNumberDriftBelowCriterion",
     "NormDriftBelowCriterion",
     "RuntimeWithinCriterion",
     "MinHessianEigenvalueCriterion",

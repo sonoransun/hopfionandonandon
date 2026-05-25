@@ -1,0 +1,56 @@
+name: correction_active
+description: |
+  Active closed-loop correction. Identical to correction_none.yaml except for the
+  `correction:` block: an ActiveFeedbackController measures Q_H every `cadence`
+  steps and, on excursion past `threshold`, applies a corrective Zeeman pulse for
+  `correction_duration` steps. The recorded q_hopf.max_drift should be smaller
+  than the no-correction baseline, and summary.json["metrics"]["correction"]
+  reports how many corrections fired.
+
+grid:
+  nx: 40
+  ny: 40
+  nz: 40
+  dx: 0.4
+  bc: periodic
+
+material:
+  A_ex: 1.0
+  D: 1.5
+  Ku: 0.7
+  easy_axis: [0, 0, 1]
+  H_ext: [0, 0, 0]
+
+initial:
+  kind: hopfion
+  R: 1.5
+
+run:
+  - kind: relax
+    n_steps: 30
+    dt: 0.002
+  - kind: thermal_burst
+    n_steps: 80
+    dt: 0.002
+    alpha: 0.1
+    kT: 2.0
+
+correction:
+  kind: active
+  target_Q: 1.0
+  threshold: 0.05
+  gain: 3.0
+  cadence: 10
+  correction_duration: 6
+
+qc:
+  fail_on:
+    - norm_drift_below:  {tol: 1.0e-10}
+  warn_on:
+    - hopf_index_within: {target: 1.0, tol: 0.2}
+
+io:
+  out: runs/correction_active/
+
+seed: 0
+backend: numpy

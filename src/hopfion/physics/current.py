@@ -39,6 +39,22 @@ from hopfion.topology import (
 )
 
 
+def emergent_field(m, grid: Grid):
+    """Emergent electromagnetic structure of the texture.
+
+    Returns ``(b_e, monopole_density)`` where ``b_e = F/4π`` is the emergent
+    magnetic flux density (its z-slice flux equals the skyrmion number) and
+    ``monopole_density = ∇·b_e`` is the emergent-magnetic-charge density — zero
+    for a smooth field, spiking at Bloch points. Both are finite-difference
+    (local), so this is valid in the presence of singularities. Shapes:
+    ``b_e`` is ``(3, nx, ny, nz)``, ``monopole_density`` is ``(nx, ny, nz)``.
+    """
+    from hopfion.topology import _fd_gyro_field, monopole_density
+    np = xp()
+    b_e = _fd_gyro_field(m, grid) / (4.0 * np.pi)
+    return b_e, monopole_density(m, grid)
+
+
 def hopf_charge_density(m, grid: Grid):
     """Scalar Hopf-charge density rho_Q(r) = (1/16π²) A·F (no integration)."""
     np = xp()
@@ -165,6 +181,32 @@ def centroids(rho_Q, grid: Grid, threshold_rel: float = 0.1) -> List[Centroid]:
     return out
 
 
+def per_site_charges(rho_Q, grid: Grid, sites) -> List[float]:
+    """Integrate the Hopf-charge density over each lattice site's Voronoi zone.
+
+    Every grid cell is assigned to its nearest ``site`` (a ``(x, y, z)`` tuple,
+    as produced by ``hopfion.lattice.*_sites_*``); the signed ``rho_Q`` is summed
+    within each zone and multiplied by the cell volume. This is the *Eulerian*,
+    segmentation-free per-site charge — complementary to ``centroids``, which
+    finds charge blobs without reference to the intended lattice. Returns one
+    signed charge per site, aligned with the ``sites`` order. The sum over sites
+    equals the system-level ``∫ rho_Q dV`` (≈ the total Hopf index).
+    """
+    from scipy.spatial import cKDTree
+
+    rho = to_numpy(rho_Q).ravel()
+    X, Y, Z = grid.coords()
+    pts = _np.stack([to_numpy(X).ravel(), to_numpy(Y).ravel(), to_numpy(Z).ravel()], axis=1)
+    sites_arr = _np.asarray(list(sites), dtype=float)
+    if sites_arr.ndim != 2 or sites_arr.shape[1] != 3:
+        raise ValueError("sites must be a sequence of (x, y, z) tuples")
+    _, idx = cKDTree(sites_arr).query(pts)
+    charges = _np.zeros(len(sites_arr))
+    _np.add.at(charges, idx, rho)
+    charges *= grid.dV
+    return [float(c) for c in charges]
+
+
 def drift_velocity(history: List[List[Centroid]], times: List[float]) -> List[List[Tuple[float, float, float]]]:
     """Approximate per-cluster velocity by central differencing matched centroids.
 
@@ -198,10 +240,12 @@ def drift_velocity(history: List[List[Centroid]], times: List[float]) -> List[Li
 
 __all__ = [
     "hopf_charge_density",
+    "emergent_field",
     "topological_current",
     "divergence_J",
     "conservation_residual",
     "centroids",
+    "per_site_charges",
     "drift_velocity",
     "Centroid",
 ]

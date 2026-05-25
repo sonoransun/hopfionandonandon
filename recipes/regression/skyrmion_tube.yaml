@@ -1,0 +1,44 @@
+name: regression_skyrmion_tube
+description: |
+  Frozen regression: small grid, short run, deterministic. Locked output is in
+  recipes/regression/golden.json. extended_metrics is on so the skyrmion-number
+  criterion is exercised.
+
+grid:
+  nx: 32
+  ny: 32
+  nz: 16
+  dx: 0.3
+  bc: periodic
+
+material:
+  A_ex: 1.0
+  D: 1.5
+  Ku: 0.5
+  easy_axis: [0, 0, 1]
+  H_ext: [0, 0, 0]
+
+initial:
+  kind: skyrmion
+  skyrmion_radius: 1.5
+  skyrmion_helicity: 1.5707963267948966   # π/2 (Bloch)
+  skyrmion_vorticity: 1
+
+run:
+  - kind: relax
+    n_steps: 60
+    dt: 0.003
+
+qc:
+  fail_on:
+    - energy_monotonicity:    {tol: 1.0e-6}
+    - norm_drift_below:       {tol: 1.0e-10}
+    - skyrmion_number_within: {target: -1.0, tol: 0.1}
+
+io:
+  out: runs/regression_skyrmion_tube/
+  extended_metrics: true
+  write_report: false
+
+seed: 0
+backend: numpy

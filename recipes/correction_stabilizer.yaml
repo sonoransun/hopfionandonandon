@@ -1,0 +1,56 @@
+name: correction_stabilizer
+description: |
+  Stabilizer-code-style protection of a hopfion lattice. A StabilizerController
+  monitors the per-site syndrome (centroid count) every `cadence` steps during a
+  thermal burst; if the live count drops below `expected_sites` it logs a flip
+  event (the localized re-nucleation burst is Phase-D scaffolding). Pairs with
+  the per_site_voronoi_health QC criterion to grade lattice fidelity.
+
+grid:
+  nx: 56
+  ny: 56
+  nz: 24
+  dx: 0.4
+  bc: periodic
+
+material:
+  A_ex: 1.0
+  D: 1.5
+  Ku: 0.7
+  easy_axis: [0, 0, 1]
+  H_ext: [0, 0, 0]
+
+initial:
+  kind: hopfion_array
+  R: 1.5
+  array_lattice: triangular
+  array_a: 6.0
+  array_n_rings: 1
+
+run:
+  - kind: relax
+    n_steps: 40
+    dt: 0.002
+  - kind: thermal_burst
+    n_steps: 40
+    dt: 0.002
+    alpha: 0.1
+    kT: 0.3
+
+correction:
+  kind: stabilizer
+  expected_sites: 7
+  cadence: 20
+
+qc:
+  fail_on:
+    - norm_drift_below:         {tol: 1.0e-10}
+  warn_on:
+    - per_site_voronoi_health:  {min_fidelity: 0.8}
+
+io:
+  out: runs/correction_stabilizer/
+  extended_metrics: true
+
+seed: 0
+backend: numpy
